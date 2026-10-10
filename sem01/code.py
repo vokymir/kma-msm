@@ -60,6 +60,12 @@ class GoodnessOfFitResults:
     p_value_y: float
 
 
+@dataclass
+class SampleSizeDependenceResults:
+    sample_sizes: list[int]
+    empirical_results: list[EmpiricalCharacteristics]
+
+
 def normalize_density(f: Expr, region: Region, constant: Symbol) -> (Expr, Expr):
     """
     Integrate f across all sub-regions and solve for constant c.
@@ -243,6 +249,31 @@ def calculate_goodness_of_fit(
         p_value_y=float(ks_y.pvalue),
     )
 
+def calculate_sample_size_dependence(
+    f: Expr,
+    domain_condition: Expr,
+    x: Symbol,
+    y: Symbol,
+    sample_sizes: list[int] = [50, 100, 250, 500, 1000, 2500, 5000],
+    alpha: float = 0.05,
+) -> SampleSizeDependenceResults:
+    """
+    Calculate point estimates and confidence intervals across various sample sizes n.
+    """
+    max_n = max(sample_sizes)
+    full_samples = generate_samples(
+        f, domain_condition, x, y, n_samples=max_n, bounds=((0, 2), (0, 3))
+    )
+
+    empirical_results = [
+        calculate_empirical_characteristics(full_samples[:n], alpha=alpha)
+        for n in sample_sizes
+    ]
+
+    return SampleSizeDependenceResults(
+        sample_sizes=sample_sizes, empirical_results=empirical_results
+    )
+
 def visualize_density(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
     """
     Visualize density function on domain.
@@ -423,6 +454,100 @@ def visualize_empirical_vs_theoretical(
     plt.show()
 
 
+def visualize_sample_size_dependence(
+    results: SampleSizeDependenceResults, theo: TheoreticalCharacteristics
+) -> None:
+    """
+    Plot convergence of estimates and confidence interval widths as sample size n increases.
+    """
+    n_vals = results.sample_sizes
+    emp_list = results.empirical_results
+
+    theo_ex = float(theo.mean_x)
+    theo_ey = float(theo.mean_y)
+    theo_vx = float(theo.var_x)
+    theo_vy = float(theo.var_y)
+    theo_cov = float(theo.cov_xy)
+
+    # Extract means and CIs
+    mean_x_vals = [e.mean_x for e in emp_list]
+    mean_y_vals = [e.mean_y for e in emp_list]
+    ci_mean_x_low = [e.ci_mean_x[0] for e in emp_list]
+    ci_mean_x_high = [e.ci_mean_x[1] for e in emp_list]
+    ci_mean_y_low = [e.ci_mean_y[0] for e in emp_list]
+    ci_mean_y_high = [e.ci_mean_y[1] for e in emp_list]
+
+    # CI widths
+    width_mean_x = [e.ci_mean_x[1] - e.ci_mean_x[0] for e in emp_list]
+    width_mean_y = [e.ci_mean_y[1] - e.ci_mean_y[0] for e in emp_list]
+
+    # Extract variances & covariance
+    var_x_vals = [e.var_x for e in emp_list]
+    var_y_vals = [e.var_y for e in emp_list]
+    cov_xy_vals = [e.cov_xy for e in emp_list]
+
+    fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+
+    # --- Plot 1: Mean Convergence & 95% CIs ---
+    axes[0, 0].plot(n_vals, mean_x_vals, "o-", color="tab:blue", label="Sample $E[X]$")
+    axes[0, 0].fill_between(
+        n_vals, ci_mean_x_low, ci_mean_x_high, color="tab:blue", alpha=0.2, label="95% CI ($X$)"
+    )
+    axes[0, 0].axhline(theo_ex, color="blue", linestyle="--", label=f"Theoretical $E[X]$ ({theo_ex:.3f})")
+
+    axes[0, 0].plot(n_vals, mean_y_vals, "s-", color="tab:orange", label="Sample $E[Y]$")
+    axes[0, 0].fill_between(
+        n_vals, ci_mean_y_low, ci_mean_y_high, color="tab:orange", alpha=0.2, label="95% CI ($Y$)"
+    )
+    axes[0, 0].axhline(theo_ey, color="orange", linestyle="--", label=f"Theoretical $E[Y]$ ({theo_ey:.3f})")
+
+    axes[0, 0].set_xscale("log")
+    axes[0, 0].set_xlabel("Sample Size (n)")
+    axes[0, 0].set_ylabel("Mean Estimate")
+    axes[0, 0].set_title("Mean Estimates & 95% Confidence Intervals vs. n")
+    axes[0, 0].legend()
+    axes[0, 0].grid(True)
+
+    # --- Plot 2: Confidence Interval Width Decay (~1/sqrt(n)) ---
+    axes[0, 1].plot(n_vals, width_mean_x, "o-", color="tab:blue", label="CI Width ($E[X]$)")
+    axes[0, 1].plot(n_vals, width_mean_y, "s-", color="tab:orange", label="CI Width ($E[Y]$)")
+
+    axes[0, 1].set_xscale("log")
+    axes[0, 1].set_yscale("log")
+    axes[0, 1].set_xlabel("Sample Size (n) [Log Scale]")
+    axes[0, 1].set_ylabel("CI Width [Log Scale]")
+    axes[0, 1].set_title("Confidence Interval Width Decay ($\propto 1/\\sqrt{n}$)")
+    axes[0, 1].legend()
+    axes[0, 1].grid(True, which="both", linestyle="--")
+
+    # --- Plot 3: Variance Convergence ---
+    axes[1, 0].plot(n_vals, var_x_vals, "o-", color="tab:green", label="Sample $Var(X)$")
+    axes[1, 0].axhline(theo_vx, color="green", linestyle="--", label=f"Theoretical $Var(X)$ ({theo_vx:.3f})")
+
+    axes[1, 0].plot(n_vals, var_y_vals, "s-", color="tab:red", label="Sample $Var(Y)$")
+    axes[1, 0].axhline(theo_vy, color="red", linestyle="--", label=f"Theoretical $Var(Y)$ ({theo_vy:.3f})")
+
+    axes[1, 0].set_xscale("log")
+    axes[1, 0].set_xlabel("Sample Size (n)")
+    axes[1, 0].set_ylabel("Variance Estimate")
+    axes[1, 0].set_title("Variance Estimates vs. n")
+    axes[1, 0].legend()
+    axes[1, 0].grid(True)
+
+    # --- Plot 4: Covariance Convergence ---
+    axes[1, 1].plot(n_vals, cov_xy_vals, "d-", color="tab:purple", label="Sample $Cov(X, Y)$")
+    axes[1, 1].axhline(theo_cov, color="purple", linestyle="--", label=f"Theoretical $Cov(X, Y)$ ({theo_cov:.3f})")
+
+    axes[1, 1].set_xscale("log")
+    axes[1, 1].set_xlabel("Sample Size (n)")
+    axes[1, 1].set_ylabel("Covariance Estimate")
+    axes[1, 1].set_title("Covariance Estimate vs. n")
+    axes[1, 1].legend()
+    axes[1, 1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
 
 def main():
     x: Symbol = sp.Symbol("x", real=True)
@@ -483,8 +608,8 @@ def main():
 
     domain: Expr = (y <= x + 2) & (y <= 4 - x) & (x <= 2) & (x >= 0) & (y >= 0)
 
-    # visualize_density(normalized_f, domain, x, y)
-    # visualize_marginals(f_X, F_X, f_Y, F_Y, x, y)
+    visualize_density(normalized_f, domain, x, y)
+    visualize_marginals(f_X, F_X, f_Y, F_Y, x, y)
 
     # task 3
     stats = calculate_characteristics(normalized_f, region_x, x, y)
@@ -500,7 +625,7 @@ def main():
     # task 4
     samples: np.ndarray = generate_samples(normalized_f, domain, x, y,
                                             bounds=((0,2),(0,3)))
-    # visualize_samples(samples)
+    visualize_samples(samples)
 
     # task 5
     emp = calculate_empirical_characteristics(samples, alpha=0.05)
@@ -521,6 +646,21 @@ def main():
 
     visualize_empirical_vs_theoretical(samples, f_X, F_X, f_Y, F_Y, x, y, gof)
 
+    # task 7
+    sample_sizes = [50, 100, 250, 500, 1000, 2500, 5000]
+    dep_results = calculate_sample_size_dependence(
+        normalized_f, domain, x, y, sample_sizes=sample_sizes
+    )
+
+    print("=== Sample Size Dependence Summary ===")
+    print(f"{'n':>6} | {'Mean X':>8} | {'95% CI Width X':>14} | {'Mean Y':>8} | {'95% CI Width Y':>14}")
+    print("-" * 62)
+    for n, res in zip(dep_results.sample_sizes, dep_results.empirical_results):
+        w_x = res.ci_mean_x[1] - res.ci_mean_x[0]
+        w_y = res.ci_mean_y[1] - res.ci_mean_y[0]
+        print(f"{n:>6} | {res.mean_x:>8.4f} | {w_x:>14.4f} | {res.mean_y:>8.4f} | {w_y:>14.4f}")
+
+    visualize_sample_size_dependence(dep_results, stats)
 
 if __name__ == "__main__":
     main()
