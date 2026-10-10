@@ -1,6 +1,8 @@
-from typing import TypeAlias, cast, NamedTuple
-
 from dataclasses import dataclass
+from typing import TypeAlias, cast
+
+import matplotlib.pyplot as plt
+import numpy as np
 import sympy as sp
 from sympy import Expr, Symbol
 
@@ -71,6 +73,46 @@ def marginal(density: Expr, region: Region) -> Expr:
     return cast(Expr, sp.Piecewise(*pieces))
 
 
+def visualize(density: Expr, regions: BothAxisRegion, symbols: tuple[Symbol, ...]):
+    """Visualize the joint density and its valid integration region."""
+    f_num = sp.lambdify(symbols, density, modules="numpy")
+
+    x_sym, y_sym = symbols
+
+    X, Y = np.meshgrid(
+        np.linspace(0, 2, 200),
+        np.linspace(0, 3, 200),
+    )
+
+    upper = np.where(X <= 1, X + 2, 4 - X)
+
+    mask = (X >= 0) & (X <= 2) & (Y >= 0) & (Y <= upper)
+
+    # Evaluate the density only inside the valid region.
+    Z = np.where(mask, f_num(X, Y), np.nan)
+
+    fig = plt.figure(figsize=(13, 9))
+
+    # 3D joint density surface.
+    ax = fig.add_subplot(111, projection="3d")
+    ax.plot_surface(
+        X,
+        Y,
+        Z,
+        cmap="viridis",
+        edgecolor="none",
+        alpha=0.9,
+    )
+
+    ax.set_xlabel(str(x_sym))
+    ax.set_ylabel(str(y_sym))
+    ax.set_zlabel("f(x, y)")
+    ax.set_title("Joint Probability Density Function")
+
+    plt.tight_layout()
+    plt.show()
+
+
 def main():
     x: Symbol = sp.Symbol("x", real=True)
     y: Symbol = sp.Symbol("y", real=True)
@@ -111,7 +153,7 @@ def main():
                 cond_=(2 <= y) & (y <= 3),
                 bound_=(
                     IntegrationBound(symbol_=x, from_=y - 2, to_=4 - y),
-                    IntegrationBound(symbol_=x, from_=2, to_=3),
+                    IntegrationBound(symbol_=y, from_=2, to_=3),
                 ),
             ),
         ),
@@ -127,6 +169,8 @@ def main():
     marginal_X = marginal(normalized, region.x)
     marginal_Y = marginal(normalized, region.y)
     print(f"F_X(x) = {marginal_X}\nF_Y(y) = {marginal_Y}")
+
+    visualize(normalized, region, (x, y))
 
 
 if __name__ == "__main__":
