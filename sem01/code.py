@@ -58,7 +58,7 @@ def marginal(f: Expr, region: Region) -> Expr:
     return sp.Piecewise(*pieces)
 
 
-def visualize(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
+def visualize_density(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
     """
     Visualize density function on domain.
     """
@@ -81,7 +81,49 @@ def visualize(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
     ax.set_xlabel(str(x))
     ax.set_ylabel(str(y))
     ax.set_zlabel("f(x, y)")
-    ax.set_title(f"Density function {f}\n on {domain_condition}")
+    ax.set_title(f"Density function {f}")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_marginals(
+    f_X: Expr, F_X: Expr, f_Y: Expr, F_Y: Expr, x: Symbol, y: Symbol
+) -> None:
+    """
+    Plot 1D marginal for X and Y in a 2x2 grid.
+    """
+    f_X_num = sp.lambdify(x, f_X, modules="numpy")
+    F_X_num = sp.lambdify(x, F_X, modules="numpy")
+    f_Y_num = sp.lambdify(y, f_Y, modules="numpy")
+    F_Y_num = sp.lambdify(y, F_Y, modules="numpy")
+
+    x_vals = np.linspace(-0.5, 2.5, 300)
+    y_vals = np.linspace(-0.5, 3.5, 300)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+    # X
+    axes[0, 0].plot(x_vals, f_X_num(x_vals), color="tab:blue", lw=2)
+    axes[0, 0].set_title("$f_X(x)$")
+    axes[0, 0].set_xlabel("x")
+    axes[0, 0].grid(True)
+
+    axes[0, 1].plot(x_vals, F_X_num(x_vals), color="tab:orange", lw=2)
+    axes[0, 1].set_title("$F_X(x)$")
+    axes[0, 1].set_xlabel("x")
+    axes[0, 1].grid(True)
+
+    # Y
+    axes[1, 0].plot(y_vals, f_Y_num(y_vals), color="tab:green", lw=2)
+    axes[1, 0].set_title("$f_Y(y)$")
+    axes[1, 0].set_xlabel("y")
+    axes[1, 0].grid(True)
+
+    axes[1, 1].plot(y_vals, F_Y_num(y_vals), color="tab:red", lw=2)
+    axes[1, 1].set_title("$F_Y(y)$")
+    axes[1, 1].set_xlabel("y")
+    axes[1, 1].grid(True)
 
     plt.tight_layout()
     plt.show()
@@ -142,7 +184,9 @@ def main():
     print(f"F_Y(y) = {F_Y}")
 
     domain: Expr = (y <= x + 2) & (y <= 4 - x) & (x <= 2) & (x >= 0) & (y >= 0)
-    visualize(normalized_f, domain, x, y)
+
+    visualize_density(normalized_f, domain, x, y)
+    visualize_marginals(f_X, F_X, f_Y, F_Y, x, y)
 
 
 if __name__ == "__main__":
