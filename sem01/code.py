@@ -37,6 +37,7 @@ class TheoreticalCharacteristics:
     cov_xy: Expr
     cov_matrix: sp.Matrix
 
+
 @dataclass
 class EmpiricalCharacteristics:
     mean_x: float
@@ -49,6 +50,14 @@ class EmpiricalCharacteristics:
     ci_mean_y: tuple[float, float]
     ci_var_x: tuple[float, float]
     ci_var_y: tuple[float, float]
+
+
+@dataclass
+class GoodnessOfFitResults:
+    ks_stat_x: float
+    p_value_x: float
+    ks_stat_y: float
+    p_value_y: float
 
 
 def normalize_density(f: Expr, region: Region, constant: Symbol) -> (Expr, Expr):
@@ -211,6 +220,29 @@ def calculate_empirical_characteristics(
         ci_var_y=ci_var_y,
     )
 
+
+def calculate_goodness_of_fit(
+    samples: np.ndarray, F_X: Expr, F_Y: Expr, x: Symbol, y: Symbol
+) -> GoodnessOfFitResults:
+    """
+    Evaluate agreement between sample data and theoretical CDFs using the Kolmogorov-Smirnov test.
+    """
+    x_data = samples[:, 0]
+    y_data = samples[:, 1]
+
+    F_X_num = sp.lambdify(x, F_X, modules="numpy")
+    F_Y_num = sp.lambdify(y, F_Y, modules="numpy")
+
+    ks_x = st.kstest(x_data, F_X_num)
+    ks_y = st.kstest(y_data, F_Y_num)
+
+    return GoodnessOfFitResults(
+        ks_stat_x=float(ks_x.statistic),
+        p_value_x=float(ks_x.pvalue),
+        ks_stat_y=float(ks_y.statistic),
+        p_value_y=float(ks_y.pvalue),
+    )
+
 def visualize_density(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
     """
     Visualize density function on domain.
@@ -295,6 +327,102 @@ def visualize_samples(samples: np.ndarray) -> None:
     plt.tight_layout()
     plt.show()
 
+def visualize_empirical_vs_theoretical(
+    samples: np.ndarray,
+    f_X: Expr,
+    F_X: Expr,
+    f_Y: Expr,
+    F_Y: Expr,
+    x: Symbol,
+    y: Symbol,
+    gof: GoodnessOfFitResults | None = None,
+) -> None:
+    """
+    Plot sample histograms and ECDFs overlaid with theoretical marginal PDFs and CDFs.
+    """
+    x_data = np.sort(samples[:, 0])
+    y_data = np.sort(samples[:, 1])
+    n = len(samples)
+
+    f_X_num = sp.lambdify(x, f_X, modules="numpy")
+    F_X_num = sp.lambdify(x, F_X, modules="numpy")
+    f_Y_num = sp.lambdify(y, f_Y, modules="numpy")
+    F_Y_num = sp.lambdify(y, F_Y, modules="numpy")
+
+    x_grid = np.linspace(-0.2, 2.2, 300)
+    y_grid = np.linspace(-0.2, 3.2, 300)
+
+    ecdf_x = np.arange(1, n + 1) / n
+    ecdf_y = np.arange(1, n + 1) / n
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 9))
+
+    # --- Plot 1: Histogram X vs PDF f_X(x) ---
+    axes[0, 0].hist(
+        x_data,
+        bins=25,
+        density=True,
+        alpha=0.6,
+        color="skyblue",
+        edgecolor="black",
+        label="Sample Histogram",
+    )
+    axes[0, 0].plot(
+        x_grid, f_X_num(x_grid), color="darkblue", lw=2.5, label="Theoretical $f_X(x)$"
+    )
+    axes[0, 0].set_title("Density Comparison (X)")
+    axes[0, 0].set_xlabel("x")
+    axes[0, 0].legend()
+    axes[0, 0].grid(True)
+
+    # --- Plot 2: ECDF X vs CDF F_X(x) ---
+    axes[0, 1].step(x_data, ecdf_x, where="post", color="orange", label="Empirical CDF (ECDF)")
+    axes[0, 1].plot(
+        x_grid, F_X_num(x_grid), color="red", linestyle="--", lw=2, label="Theoretical $F_X(x)$"
+    )
+    title_x = "CDF Comparison (X)"
+    if gof:
+        title_x += f"\nKS p-value: {gof.p_value_x:.4f}"
+    axes[0, 1].set_title(title_x)
+    axes[0, 1].set_xlabel("x")
+    axes[0, 1].legend()
+    axes[0, 1].grid(True)
+
+    # --- Plot 3: Histogram Y vs PDF f_Y(y) ---
+    axes[1, 0].hist(
+        y_data,
+        bins=25,
+        density=True,
+        alpha=0.6,
+        color="lightgreen",
+        edgecolor="black",
+        label="Sample Histogram",
+    )
+    axes[1, 0].plot(
+        y_grid, f_Y_num(y_grid), color="darkgreen", lw=2.5, label="Theoretical $f_Y(y)$"
+    )
+    axes[1, 0].set_title("Density Comparison (Y)")
+    axes[1, 0].set_xlabel("y")
+    axes[1, 0].legend()
+    axes[1, 0].grid(True)
+
+    # --- Plot 4: ECDF Y vs CDF F_Y(y) ---
+    axes[1, 1].step(y_data, ecdf_y, where="post", color="purple", label="Empirical CDF (ECDF)")
+    axes[1, 1].plot(
+        y_grid, F_Y_num(y_grid), color="black", linestyle="--", lw=2, label="Theoretical $F_Y(y)$"
+    )
+    title_y = "CDF Comparison (Y)"
+    if gof:
+        title_y += f"\nKS p-value: {gof.p_value_y:.4f}"
+    axes[1, 1].set_title(title_y)
+    axes[1, 1].set_xlabel("y")
+    axes[1, 1].legend()
+    axes[1, 1].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 def main():
     x: Symbol = sp.Symbol("x", real=True)
@@ -374,23 +502,24 @@ def main():
                                             bounds=((0,2),(0,3)))
     # visualize_samples(samples)
 
-    # task5
+    # task 5
     emp = calculate_empirical_characteristics(samples, alpha=0.05)
     print("=== Sample Estimates & 95% Confidence Intervals ===")
-    print(
-        f"Sample Mean X : {emp.mean_x:.4f} | 95% CI: [{emp.ci_mean_x[0]:.4f}, {emp.ci_mean_x[1]:.4f}]"
-    )
-    print(
-        f"Sample Mean Y : {emp.mean_y:.4f} | 95% CI: [{emp.ci_mean_y[0]:.4f}, {emp.ci_mean_y[1]:.4f}]"
-    )
-    print(
-        f"Sample Var X  : {emp.var_x:.4f} | 95% CI: [{emp.ci_var_x[0]:.4f}, {emp.ci_var_x[1]:.4f}]"
-    )
-    print(
-        f"Sample Var Y  : {emp.var_y:.4f} | 95% CI: [{emp.ci_var_y[0]:.4f}, {emp.ci_var_y[1]:.4f}]"
-    )
+    print(f"Sample Mean X : {emp.mean_x:.4f} | 95% CI: [{emp.ci_mean_x[0]:.4f}, {emp.ci_mean_x[1]:.4f}]")
+    print( f"Sample Mean Y : {emp.mean_y:.4f} | 95% CI: [{emp.ci_mean_y[0]:.4f}, {emp.ci_mean_y[1]:.4f}]")
+    print( f"Sample Var X  : {emp.var_x:.4f} | 95% CI: [{emp.ci_var_x[0]:.4f}, {emp.ci_var_x[1]:.4f}]")
+    print( f"Sample Var Y  : {emp.var_y:.4f} | 95% CI: [{emp.ci_var_y[0]:.4f}, {emp.ci_var_y[1]:.4f}]")
     print(f"Sample Cov XY : {emp.cov_xy:.4f}")
     print("\nSample Covariance Matrix:\n", emp.cov_matrix)
+
+    # task 6
+    gof = calculate_goodness_of_fit(samples, F_X, F_Y, x, y)
+
+    print("=== Goodness-of-Fit Evaluation (Kolmogorov-Smirnov Test) ===")
+    print(f"X: KS Statistic = {gof.ks_stat_x:.4f}, p-value = {gof.p_value_x:.4f}")
+    print(f"Y: KS Statistic = {gof.ks_stat_y:.4f}, p-value = {gof.p_value_y:.4f}")
+
+    visualize_empirical_vs_theoretical(samples, f_X, F_X, f_Y, F_Y, x, y, gof)
 
 
 if __name__ == "__main__":
