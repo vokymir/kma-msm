@@ -68,6 +68,88 @@ def marginal(f: Expr, region: Region) -> Expr:
     return sp.Piecewise(*pieces)
 
 
+def calculate_characteristics(
+    f: Expr, region: Region, x: Symbol, y: Symbol
+) -> TheoreticalCharacteristics:
+    """
+    Calculate E[X], E[Y], Var(X), Var(Y), Cov(X, Y), and the covariance matrix.
+    """
+
+    def expect(g: Expr) -> Expr:
+        """
+        Helper to calculate expectation E[g(X, Y)].
+        """
+        return sum(
+            sp.integrate(
+                g * f,
+                (sub.inner_var, sub.inner_from, sub.inner_to),
+                (sub.outer_var, sub.outer_from, sub.outer_to),
+            )
+            for sub in region
+        )
+
+    e_x = expect(x)
+    e_y = expect(y)
+    e_x2 = expect(x**2)
+    e_y2 = expect(y**2)
+    e_xy = expect(x * y)
+
+    var_x = e_x2 - e_x**2
+    var_y = e_y2 - e_y**2
+    cov_xy = e_xy - e_x * e_y
+
+    cov_mat = sp.Matrix([[var_x, cov_xy], [cov_xy, var_y]])
+
+    return TheoreticalCharacteristics(
+        mean_x=e_x,
+        mean_y=e_y,
+        var_x=var_x,
+        var_y=var_y,
+        cov_xy=cov_xy,
+        cov_matrix=cov_mat,
+    )
+
+
+def generate_samples(
+    f: Expr,
+    domain_condition: Expr,
+    x: Symbol,
+    y: Symbol,
+    n_samples: int = 1000,
+    bounds: tuple[tuple[float, float], tuple[float, float]] = ((0, 2), (0, 3)),
+) -> np.ndarray:
+    """
+    Generate a random sample of (X, Y) vectors from density f(x, y)
+    using the Rejection Sampling method.
+    """
+    f_num = sp.lambdify((x, y), f, modules="numpy")
+    cond_num = sp.lambdify((x, y), domain_condition, modules="numpy")
+
+    (x_min, x_max), (y_min, y_max) = bounds
+
+    # Estimate maximum height M of density function f(x, y) over domain
+    xg = np.linspace(x_min, x_max, 200)
+    yg = np.linspace(y_min, y_max, 200)
+    Xg, Yg = np.meshgrid(xg, yg)
+    M = np.max(np.where(cond_num(Xg, Yg), f_num(Xg, Yg), 0)) * 1.05
+
+    samples = []
+    batch_size = n_samples * 5
+
+    while sum(len(s) for s in samples) < n_samples:
+        x_rand = np.random.uniform(x_min, x_max, batch_size)
+        y_rand = np.random.uniform(y_min, y_max, batch_size)
+        z_rand = np.random.uniform(0, M, batch_size)
+
+        valid_domain = cond_num(x_rand, y_rand)
+        accepted = valid_domain & (z_rand <= f_num(x_rand, y_rand))
+
+        if np.any(accepted):
+            samples.append(np.column_stack((x_rand[accepted], y_rand[accepted])))
+
+    return np.vstack(samples)[:n_samples]
+
+
 def visualize_density(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
     """
     Visualize density function on domain.
@@ -139,46 +221,19 @@ def visualize_marginals(
     plt.show()
 
 
-def calculate_characteristics(
-    f: Expr, region: Region, x: Symbol, y: Symbol
-) -> TheoreticalCharacteristics:
+def visualize_samples(samples: np.ndarray) -> None:
     """
-    Calculate E[X], E[Y], Var(X), Var(Y), Cov(X, Y), and the covariance matrix.
+    Plot generated 2D random sample points.
     """
+    plt.figure(figsize=(8, 6))
+    plt.scatter(samples[:, 0], samples[:, 1], alpha=0.5, s=15, color="tab:purple")
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.title(f"Generated Random Sample (N={len(samples)})")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
-    def expect(g: Expr) -> Expr:
-        """
-        Helper to calculate expectation E[g(X, Y)].
-        """
-        return sum(
-            sp.integrate(
-                g * f,
-                (sub.inner_var, sub.inner_from, sub.inner_to),
-                (sub.outer_var, sub.outer_from, sub.outer_to),
-            )
-            for sub in region
-        )
-
-    e_x = expect(x)
-    e_y = expect(y)
-    e_x2 = expect(x**2)
-    e_y2 = expect(y**2)
-    e_xy = expect(x * y)
-
-    var_x = e_x2 - e_x**2
-    var_y = e_y2 - e_y**2
-    cov_xy = e_xy - e_x * e_y
-
-    cov_mat = sp.Matrix([[var_x, cov_xy], [cov_xy, var_y]])
-
-    return TheoreticalCharacteristics(
-        mean_x=e_x,
-        mean_y=e_y,
-        var_x=var_x,
-        var_y=var_y,
-        cov_xy=cov_xy,
-        cov_matrix=cov_mat,
-    )
 
 def main():
     x: Symbol = sp.Symbol("x", real=True)
@@ -252,6 +307,11 @@ def main():
     print("\nCovariance Matrix:")
     sp.pprint(stats.cov_matrix)
     print()
+
+    # task 4
+    samples: np.ndarray = generate_samples(normalized_f, domain, x, y,
+                                            bounds=((0,2),(0,3)))
+    visualize_samples(samples)
 
 
 if __name__ == "__main__":
