@@ -3,6 +3,7 @@ from typing import TypeAlias
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.stats as st
 import sympy as sp
 from sympy import Expr, Symbol
 
@@ -35,6 +36,19 @@ class TheoreticalCharacteristics:
     var_y: Expr
     cov_xy: Expr
     cov_matrix: sp.Matrix
+
+@dataclass
+class EmpiricalCharacteristics:
+    mean_x: float
+    mean_y: float
+    var_x: float
+    var_y: float
+    cov_xy: float
+    cov_matrix: np.ndarray
+    ci_mean_x: tuple[float, float]
+    ci_mean_y: tuple[float, float]
+    ci_var_x: tuple[float, float]
+    ci_var_y: tuple[float, float]
 
 
 def normalize_density(f: Expr, region: Region, constant: Symbol) -> (Expr, Expr):
@@ -149,6 +163,53 @@ def generate_samples(
 
     return np.vstack(samples)[:n_samples]
 
+def calculate_empirical_characteristics(
+    samples: np.ndarray, alpha: float = 0.05
+) -> EmpiricalCharacteristics:
+    """
+    Calculate point estimates and confidence intervals (for means & variances) from sample data.
+    """
+    n = len(samples)
+    x_data = samples[:, 0]
+    y_data = samples[:, 1]
+
+    # Point Estimates
+    mean_x = float(np.mean(x_data))
+    mean_y = float(np.mean(y_data))
+
+    var_x = float(np.var(x_data, ddof=1))
+    var_y = float(np.var(y_data, ddof=1))
+
+    cov_matrix = np.cov(x_data, y_data, ddof=1)
+    cov_xy = float(cov_matrix[0, 1])
+
+    # Confidence Intervals for Means (Student's t-distribution)
+    t_crit = st.t.ppf(1 - alpha / 2, df=n - 1)
+    se_x = np.sqrt(var_x / n)
+    se_y = np.sqrt(var_y / n)
+
+    ci_mean_x = (mean_x - t_crit * se_x, mean_x + t_crit * se_x)
+    ci_mean_y = (mean_y - t_crit * se_y, mean_y + t_crit * se_y)
+
+    # Confidence Intervals for Variances (Chi-Square distribution)
+    chi2_lower = st.chi2.ppf(alpha / 2, df=n - 1)
+    chi2_upper = st.chi2.ppf(1 - alpha / 2, df=n - 1)
+
+    ci_var_x = ((n - 1) * var_x / chi2_upper, (n - 1) * var_x / chi2_lower)
+    ci_var_y = ((n - 1) * var_y / chi2_upper, (n - 1) * var_y / chi2_lower)
+
+    return EmpiricalCharacteristics(
+        mean_x=mean_x,
+        mean_y=mean_y,
+        var_x=var_x,
+        var_y=var_y,
+        cov_xy=cov_xy,
+        cov_matrix=cov_matrix,
+        ci_mean_x=ci_mean_x,
+        ci_mean_y=ci_mean_y,
+        ci_var_x=ci_var_x,
+        ci_var_y=ci_var_y,
+    )
 
 def visualize_density(f: Expr, domain_condition: Expr, x: Symbol, y: Symbol) -> None:
     """
@@ -311,7 +372,25 @@ def main():
     # task 4
     samples: np.ndarray = generate_samples(normalized_f, domain, x, y,
                                             bounds=((0,2),(0,3)))
-    visualize_samples(samples)
+    # visualize_samples(samples)
+
+    # task5
+    emp = calculate_empirical_characteristics(samples, alpha=0.05)
+    print("=== Sample Estimates & 95% Confidence Intervals ===")
+    print(
+        f"Sample Mean X : {emp.mean_x:.4f} | 95% CI: [{emp.ci_mean_x[0]:.4f}, {emp.ci_mean_x[1]:.4f}]"
+    )
+    print(
+        f"Sample Mean Y : {emp.mean_y:.4f} | 95% CI: [{emp.ci_mean_y[0]:.4f}, {emp.ci_mean_y[1]:.4f}]"
+    )
+    print(
+        f"Sample Var X  : {emp.var_x:.4f} | 95% CI: [{emp.ci_var_x[0]:.4f}, {emp.ci_var_x[1]:.4f}]"
+    )
+    print(
+        f"Sample Var Y  : {emp.var_y:.4f} | 95% CI: [{emp.ci_var_y[0]:.4f}, {emp.ci_var_y[1]:.4f}]"
+    )
+    print(f"Sample Cov XY : {emp.cov_xy:.4f}")
+    print("\nSample Covariance Matrix:\n", emp.cov_matrix)
 
 
 if __name__ == "__main__":
