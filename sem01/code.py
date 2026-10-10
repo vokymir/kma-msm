@@ -27,7 +27,17 @@ class SubRegion:
 Region: TypeAlias = list[SubRegion]
 
 
-def normalize_density(f: Expr, region: Region, constant: Symbol) -> Expr:
+@dataclass
+class TheoreticalCharacteristics:
+    mean_x: Expr
+    mean_y: Expr
+    var_x: Expr
+    var_y: Expr
+    cov_xy: Expr
+    cov_matrix: sp.Matrix
+
+
+def normalize_density(f: Expr, region: Region, constant: Symbol) -> (Expr, Expr):
     """
     Integrate f across all sub-regions and solve for constant c.
     """
@@ -40,7 +50,7 @@ def normalize_density(f: Expr, region: Region, constant: Symbol) -> Expr:
         for sub in region
     )
     c_val = sp.solve(sp.Eq(total, 1), constant)[0]
-    return f.subs(constant, c_val)
+    return c_val, f.subs(constant, c_val)
 
 
 def marginal(f: Expr, region: Region) -> Expr:
@@ -129,6 +139,47 @@ def visualize_marginals(
     plt.show()
 
 
+def calculate_characteristics(
+    f: Expr, region: Region, x: Symbol, y: Symbol
+) -> TheoreticalCharacteristics:
+    """
+    Calculate E[X], E[Y], Var(X), Var(Y), Cov(X, Y), and the covariance matrix.
+    """
+
+    def expect(g: Expr) -> Expr:
+        """
+        Helper to calculate expectation E[g(X, Y)].
+        """
+        return sum(
+            sp.integrate(
+                g * f,
+                (sub.inner_var, sub.inner_from, sub.inner_to),
+                (sub.outer_var, sub.outer_from, sub.outer_to),
+            )
+            for sub in region
+        )
+
+    e_x = expect(x)
+    e_y = expect(y)
+    e_x2 = expect(x**2)
+    e_y2 = expect(y**2)
+    e_xy = expect(x * y)
+
+    var_x = e_x2 - e_x**2
+    var_y = e_y2 - e_y**2
+    cov_xy = e_xy - e_x * e_y
+
+    cov_mat = sp.Matrix([[var_x, cov_xy], [cov_xy, var_y]])
+
+    return TheoreticalCharacteristics(
+        mean_x=e_x,
+        mean_y=e_y,
+        var_x=var_x,
+        var_y=var_y,
+        cov_xy=cov_xy,
+        cov_matrix=cov_mat,
+    )
+
 def main():
     x: Symbol = sp.Symbol("x", real=True)
     y: Symbol = sp.Symbol("y", real=True)
@@ -170,8 +221,10 @@ def main():
     ]
 
     # task 1
-    normalized_f = normalize_density(f, region_x, c)  # x or y is both fine
+    c_val, normalized_f = normalize_density(f, region_x, c)  # x or y is both fine
+    print(f"c = {c_val}")
     print(f"Normalized f(x, y) = {normalized_f}")
+    print()
 
     # task 2
     f_X = sp.simplify(marginal(normalized_f, region_x))
@@ -182,11 +235,23 @@ def main():
     F_Y = sp.simplify(sp.integrate(f_Y, y))
     print(f"f_Y(y) = {f_Y}")
     print(f"F_Y(y) = {F_Y}")
+    print()
 
     domain: Expr = (y <= x + 2) & (y <= 4 - x) & (x <= 2) & (x >= 0) & (y >= 0)
 
-    visualize_density(normalized_f, domain, x, y)
-    visualize_marginals(f_X, F_X, f_Y, F_Y, x, y)
+    # visualize_density(normalized_f, domain, x, y)
+    # visualize_marginals(f_X, F_X, f_Y, F_Y, x, y)
+
+    # task 3
+    stats = calculate_characteristics(normalized_f, region_x, x, y)
+    print(f"E[X]      = {stats.mean_x} (~{float(stats.mean_x):.4f})")
+    print(f"E[Y]      = {stats.mean_y} (~{float(stats.mean_y):.4f})")
+    print(f"Var(X)    = {stats.var_x} (~{float(stats.var_x):.4f})")
+    print(f"Var(Y)    = {stats.var_y} (~{float(stats.var_y):.4f})")
+    print(f"Cov(X, Y) = {stats.cov_xy} (~{float(stats.cov_xy):.4f})")
+    print("\nCovariance Matrix:")
+    sp.pprint(stats.cov_matrix)
+    print()
 
 
 if __name__ == "__main__":
