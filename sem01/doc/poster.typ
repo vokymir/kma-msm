@@ -140,7 +140,7 @@ konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], 
   #grid(
     columns: (1.15fr, 1fr), column-gutter: 1em, row-gutter: 1.4em,
     figure(image("graphics/graphs/02_density_3d.svg"), caption: [$f(x, y)$ ve 3D]),
-    figure(image("graphics/graphs/05_sample.svg"), 
+    figure(image("graphics/graphs/14_sample_intervals.svg"), 
     caption: [Náhodně vygenerované body]),
   )
 
@@ -153,14 +153,16 @@ konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], 
   $
     f_X (x) = cases(
       0 <= x <= 1 #h(1cm) & integral_0^(x+2) f(x,y) dif y = 2/65 x (x+2)^3,
-      1 < x <= 2 & integral_0^(4-x) f(x,y) dif y = -2/65 x (x-4)^3
+      1 < x <= 2 & integral_0^(4-x) f(x,y) dif y = -2/65 x (x-4)^3,
+      "jinak" & 0
     )
   $
 
   $
     f_Y (y) = cases(
       0 <= y <= 2 #h(1cm) & integral_0^(2) f(x,y) dif x = 12/65 y^2,
-      2 < y <= 3 & integral_(y-2)^(4-y) f(x,y) dif x = 12/65 (3-y) y^2 
+      2 < y <= 3 & integral_(y-2)^(4-y) f(x,y) dif x = 12/65 (3-y) y^2,
+      "jinak" & 0
     )
   $
 
@@ -197,14 +199,19 @@ konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], 
     E[X] &= integral.double_Omega x f(x,y) dif x dif y &&= 1208/975 #h(1.5cm) &&(~1.24) \
     E[Y] &= integral.double_Omega y f(x,y) dif y dif x &&= 633/325 &&(~1.95) \
   $
-  $
-    "Var"(X) &= E[X^2] - (E X)^2 &&= 172886/950625 &&(~0.18) \
-    "Var"(Y) &= E[Y^2] - (E Y)^2 &&= 31561/105625 &&(~0.30) \
-    "Cov"(X, Y) &= E(X Y) - E(X) E(Y) &&= -38966/739375 &&(~-0.05) \
-  $
+  // $
+  //   "Var"(X) &= E[X^2] - (E X)^2 &&= 172886/950625 &&(~0.18) \
+  //   "Var"(Y) &= E[Y^2] - (E Y)^2 &&= 31561/105625 &&(~0.30) \
+  //   "Cov"(X, Y) &= E(X Y) - E(X) E(Y) &&= -38966/739375 &&(~-0.05) \
+  // $
 
   $
     Sigma = mat(
+      "var"(X), "cov"(X,Y);
+      "cov"(X,Y), "var"(Y);
+    )
+    =
+    mat(
       172886/950625, -38966/739375;
       -38966/739375, 31561/105625
     )
@@ -218,15 +225,14 @@ konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], 
   
   #grid(
     columns: (1fr, 1fr), column-gutter: 1em, row-gutter: 1.4em,
-    figure(image("graphics/graphs/06_histogram_x.svg"),
-      caption: [Marginální hustota $f_X (x)$]),
-    figure(image("graphics/graphs/08_histogram_y.svg"), 
-      caption: [Marginální hustota $f_Y (y)$]),
-    figure(image("graphics/graphs/07_ecdf_x.svg"), 
-      caption: [Distribuční funkce $F_X (x)$]),
-    figure(image("graphics/graphs/09_ecdf_y.svg"),
-      caption: [Distribuční funkce $F_Y (y)$]),
+    figure(image("graphics/graphs/15_hist_ecdf_x.svg"),
+      caption: [Marginální hustota a distribuce $X$]),
+    figure(image("graphics/graphs/16_hist_ecdf_y.svg"), 
+      caption: [Marginální hustota a distribuce $Y$]),
   )
+
+  Už pro náhodný výběr velikosti $10^3$ lze vidět, že se hustota i distribuce
+  velmi blíží analyticky získaným hodnotám.
 
   = Empirické charakteristiky
 
@@ -242,6 +248,18 @@ konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], 
 
   = Přesnost odhadu v závislosti na počtu dat
 
+  Testováním na náhodných výběrech o velikostech 50, 100, 250, 500, 1000, 2500 a
+  5000 ukazujeme závislost přesnosti na velikosti, konkrétně se odhady s větší
+  velikostí zpřesňují.
 
+  #grid(
+    columns: (1fr, 1fr), column-gutter: 1em, row-gutter: 1.4em,
+    figure(image("graphics/graphs/17_size_estimates_all.svg"),
+      caption: [Závislost odhadů charakteristik rozdělení (normalizované podle
+      analyticky získaných hodnot) na velikosti náhodného výběru.]),
+    figure(image("graphics/graphs/18_size_widths_all.svg"), 
+      caption: [Závislost šířek intervalových odhadů na velikosti náhodného
+      výběru.]),
+  )
 
 ]
