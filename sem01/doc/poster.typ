@@ -1,6 +1,6 @@
 // ------------------------------ SETTINGS ------------------------------------
 
-#let logo-path   = "graphics/fav_logo/FAV_rgb.png" // use none to hide it
+#let logo-path   = "graphics/fav_logo/FAV_cmyk.pdf" // use none to hide it
 #let logo-height = 5.5cm 
 
 #let poster-title  = "Vícerozměrné náhodné veličiny"
@@ -105,7 +105,7 @@
 #columns(2, gutter: col-gutter)[
 
   = Úvod #footnote([V této práci byla použita umělá inteligence jako nástroj pro
-konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], numbering: "*")
+  konzultaci a také aby vygenerovala `python` funkce pro vizualizaci zpracovaných dat.], numbering: "*")
 
   Uvažujme náhodné vícerozměrné rozdělení dané sdruženou funkcí hustoty
 
