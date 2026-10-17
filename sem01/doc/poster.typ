@@ -1,11 +1,12 @@
 // ------------------------------ SETTINGS ------------------------------------
 
-#let logo-path   = "graphics/FAV_rgb.png" // use none to hide it
+#let logo-path   = "graphics/fav_logo/FAV_rgb.png" // use none to hide it
 #let logo-height = 5.5cm 
 
 #let poster-title  = "Vícerozměrné náhodné veličiny"
 #let poster-author = "Jakub Vokoun"
 #let poster-affil  = "Fakulta aplikovaných věd Západočeské univerzity"
+#let poster-date = "17.10.2026"
 
 // A2 = 14pt, A1 = 20pt, A0 = 28pt
 #let paper     = "a2"
@@ -80,10 +81,12 @@
       text(size: 1.7em)[#poster-author#super[1]]
       linebreak()
       text(size: 1.15em)[#super[1]#poster-affil]
+      linebreak()
+      v(0.9em)
+      text()[#poster-date]
     },
     if logo-path != none { image(logo-path, height: logo-height) },
   )
-  v(0.9em)
   line(length: 100%, stroke: 0.16em + ink)
   v(0.4em)
 }
@@ -101,7 +104,8 @@
 
 #columns(2, gutter: col-gutter)[
 
-  = Úvod
+  = Úvod #footnote([V této práci byla použita umělá inteligence jako nástroj pro
+konzultaci a také aby vygenerovala funkce pro vizualizaci zpracovaných dat.], numbering: "*")
 
   Uvažujme náhodné vícerozměrné rozdělení dané sdruženou funkcí hustoty
 
@@ -116,7 +120,8 @@
   $ <eq:omega>
 
   Pro toto rozdělení analyticky odvodíme teoretické charakteristiky,
-  vygenerujeme příslušný náhodný výběr, spočteme jeho charakteristiky a
+  vygenerujeme příslušný náhodný výběr (v jazyku `Python` s pomocí knihoven
+  `numpy`, `sympy`, `scipy` a `matplotlib`), spočteme jeho charakteristiky a
   porovnáme je.
 
   = Neznámá konstanta $c$
@@ -132,13 +137,11 @@
   Po vyřešení dostáváme hodnotu konstanty $c=6/65$.
 
 
-  // TODO: plot
-  // A 3D plot next to a scatter plot (swap placeholders for images):
   #grid(
     columns: (1.15fr, 1fr), column-gutter: 1em, row-gutter: 1.4em,
-    figure(placeholder(h: 7cm), caption: [$f(x, y)$ ve 3D]),
-    figure(placeholder(h: 7cm), caption: [Náhodně vygenerované body]),
-    // figure(image("figs/surface.png", width: 100%), caption: [$f(x, y)$ ve 3D]),
+    figure(image("graphics/graphs/02_density_3d.svg"), caption: [$f(x, y)$ ve 3D]),
+    figure(image("graphics/graphs/05_sample.svg"), 
+    caption: [Náhodně vygenerované body]),
   )
 
   = Marginální rozdělení
@@ -193,6 +196,8 @@
   $
     E[X] &= integral.double_Omega x f(x,y) dif x dif y &&= 1208/975 #h(1.5cm) &&(~1.24) \
     E[Y] &= integral.double_Omega y f(x,y) dif y dif x &&= 633/325 &&(~1.95) \
+  $
+  $
     "Var"(X) &= E[X^2] - (E X)^2 &&= 172886/950625 &&(~0.18) \
     "Var"(Y) &= E[Y^2] - (E Y)^2 &&= 31561/105625 &&(~0.30) \
     "Cov"(X, Y) &= E(X Y) - E(X) E(Y) &&= -38966/739375 &&(~-0.05) \
@@ -205,20 +210,38 @@
     )
   $
 
-
   = Generování dat
 
-  // 2×2 grid of figures
+  Generování náhodného výběru se řídilo zamítací metodou. Bylo vygenerováno na
+  1000 bodů s fixním seedem generátoru náhodných čísel pro jednoduchou
+  replikaci.
+  
   #grid(
     columns: (1fr, 1fr), column-gutter: 1em, row-gutter: 1.4em,
-    figure(placeholder(), caption: [Marginální hustota $f_X (x)$]),
-    figure(placeholder(), caption: [Marginální hustota $f_Y (y)$]),
-    figure(placeholder(), caption: [Distribuční funkce $F_X (x)$]),
-    figure(placeholder(), caption: [Distribuční funkce $F_Y (y)$]),
+    figure(image("graphics/graphs/06_histogram_x.svg"),
+      caption: [Marginální hustota $f_X (x)$]),
+    figure(image("graphics/graphs/08_histogram_y.svg"), 
+      caption: [Marginální hustota $f_Y (y)$]),
+    figure(image("graphics/graphs/07_ecdf_x.svg"), 
+      caption: [Distribuční funkce $F_X (x)$]),
+    figure(image("graphics/graphs/09_ecdf_y.svg"),
+      caption: [Distribuční funkce $F_Y (y)$]),
   )
 
   = Empirické charakteristiky
 
+  Odhady z výběru a jejich 95% intervalové odhady
+
+  $
+    hat(x) &= 1.222 plus.minus 0.026 \
+    hat(y) &= 1.982 plus.minus 0.034 \
+    "var"(x) &= 0.171 plus.minus 0.015 \
+    "var"(y) &= 0.300 plus.minus 0.026 \
+    "cov"(X,Y) &= -0.047.
+  $
+
   = Přesnost odhadu v závislosti na počtu dat
-  Text a obrázky.
+
+
+
 ]
