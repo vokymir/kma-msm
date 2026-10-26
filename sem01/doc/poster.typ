@@ -174,6 +174,8 @@
   Získáme integrací odpovídajících marginálních funkcí hustoty.
 
   $
+  \
+  \
     F_X (x) = integral_0^x f_X (x) dif x =  cases(
       x <= 0 #h(1cm) & 0,
       x <= 1 & 1/325 x^2 (2 x^3 + 15 x^2 + 40 x + 40),
@@ -181,6 +183,7 @@
       x <= 2 & 1/325 (-2 x^5 + 30 x^4 - 160 x^3 + 320 x ^2 - 91),
       x > 2 & 1,
     )
+
   $
 
   $
@@ -220,7 +223,7 @@
   = Generování dat
 
   Generování náhodného výběru se řídilo zamítací metodou. Bylo vygenerováno na
-  1000 bodů s fixním seedem generátoru náhodných čísel pro jednoduchou
+  1000 bodů s fixním seedem generátoru náhodných čísel (2026) pro jednoduchou
   replikaci.
   
   #grid(
@@ -251,6 +254,12 @@
   Testováním na náhodných výběrech o velikostech 50, 100, 250, 500, 1000, 2500 a
   5000 ukazujeme závislost přesnosti na velikosti, konkrétně se odhady s větší
   velikostí zpřesňují.
+
+  Na grafu vidíme body pro naměřené velikosti rozptylů spojené barevnou čarou -
+  je to pouze pro jednodušší orientaci v grafu, nic nevypovídá o skutečných
+  hodnotách mezi body. Pro větší přehlednost byly jednotlivé odhady v grafu
+  vizuálně _posunuty_ v horizontálním směru, aby se nepřekrývaly - hodnoty však
+  byly naměřeny všechny ve výše zmíněných bodech.
 
   #grid(
     columns: (1fr, 1fr), column-gutter: 1em, row-gutter: 1.4em,
