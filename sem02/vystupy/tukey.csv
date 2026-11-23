@@ -1,0 +1,7 @@
+promenna,skupina_1,skupina_2,rozdil,dolni_mez,horni_mez,p_adj,zamitame
+Weight,Bream,Perch,-235.5893,0.0004,-377.8783,-93.3003,True
+Weight,Bream,Roach,-457.7759,0.0,-645.9521,-269.5998,True
+Weight,Perch,Roach,-222.1867,0.009,-397.5094,-46.8639,True
+Height,Bream,Perch,-7.3213,0.0,-8.5512,-6.0915,True
+Height,Bream,Roach,-8.4769,0.0,-10.1033,-6.8504,True
+Height,Perch,Roach,-1.1555,0.1704,-2.6708,0.3598,False
