@@ -221,7 +221,11 @@
 
 - *MANOVA (Pillai):* všechny dvojice druhů se při společném hodnocení hmotnosti a výšky významně liší.
 
-- *Předpoklady:* Shapiro–Wilkův test reziduí i Leveneův test ukazují na porušení normality reziduí a homogenity rozptylů. Proto upřednostňujeme Welchův test a neparametrické výsledky (Kruskal–Wallis, Dunn).
+- *Předpoklady:* Shapiro–Wilkův test reziduí i Leveneův test ukazují na porušení
+  normality i shody rozptylů. Welchův test řeší jen nestejné rozptyly, normalitu
+  stále předpokládá. U okouna a cejna ($n = 56, 35$) ji zmírňuje větší počet
+  pozorování, u plotic ($n = 19$) méně. Parametrické výsledky proto doplňujeme
+  neparametrickými (Mann–Whitney, Kruskal–Wallis, Dunn) jako kontrolou.
 
 #nice-table(
   columns: (1.1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
@@ -237,14 +241,12 @@
 
 #v(0.4em)
 
-*Celkový závěr:* Kruskalův–Wallisův test potvrdil statisticky významné rozdíly mezi druhy v hmotnosti i výšce. Dunnův test ukázal, že cejn se významně liší od okouna i plotice v obou proměnných. Dvojice okoun–plotice se liší v hmotnosti, ale ne ve výšce. Efekt druhu je větší u výšky ($eta^2 = 0.694$, $epsilon^2 = 0.631$) než u hmotnosti ($eta^2 = 0.249$, $epsilon^2 = 0.279$).
-
 == Proč více metod
 
 - *Welch místo klasického t-testu:* rozptyly druhů se liší, a Welchův test
   shodu rozptylů nevyžaduje.
-- *Neparametrické testy jako kontrola:* hmotnost okouna je zešikmená a
-  pořadové testy jsou méně citlivé na pár velkých ryb.
+- *Neparametrické testy jako kontrola:* Welch normalitu stále předpokládá. 
+  Hmotnost okouna je zešikmená a pořadové testy jsou méně citlivé na pár velkých ryb.
 - *Holmova korekce:* každou proměnnou porovnáváme ve třech dvojicích,
   korekce brání tomu, aby se nahromadily falešně významné výsledky.
 - *Vícerozměrný pohled:* hmotnost a výška spolu silně souvisejí (protáhlé
