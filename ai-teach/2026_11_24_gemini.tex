@@ -1,0 +1,777 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[a4paper, margin=2.1cm, headheight=14pt]{geometry}
+\usepackage{fontspec}
+\usepackage[english, bidi=basic, provide=*]{babel}
+\babelprovide[import, onchar=ids fonts]{english}
+\babelfont{rm}{Noto Sans}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+\definecolor{navy}{HTML}{1B365D}
+\definecolor{teal}{HTML}{0F766E}
+\definecolor{crimson}{HTML}{991B1B}
+\definecolor{slate}{HTML}{475569}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=navy,
+    urlcolor=teal,
+    pdftitle={Multidimensional Statistical Methods: A Deep Intuition Guide for CS Students}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textcolor{slate}{Multidimensional Statistical Methods (MSM) --- Deep Intuition Guide}}
+\rhead{\small\textcolor{slate}{\texttt{zcu-sediva/MSM} (P01--P12)}}
+\cfoot{\small\textcolor{slate}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\setlist[itemize]{leftmargin=1.5em, itemsep=2pt, topsep=3pt}
+\setlist[enumerate]{leftmargin=1.5em, itemsep=2pt, topsep=3pt}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE\bfseries\textcolor{navy}{Multidimensional Statistical Methods (MSM)}}\\[0.4em]
+    {\large\textcolor{teal}{A Deep, Plain-Language \& Geometric Guide for Computer Science Students}}\\[0.6em]
+    {\small\textcolor{slate}{Aligned with the \texttt{zcu-sediva/MSM} Course Repository (Lectures P01 through P12)}}
+\end{center}
+
+\vspace{0.3em}
+\noindent\textcolor{navy}{\rule{\textwidth}{1.2pt}}
+\vspace{0.3em}
+
+\textbf{How to read this guide.} Mathematics lecture slides are usually written like compiled binaries: dense, exact, and stripped of the mental scaffolding that makes them intuitive. As a computer science student, you already possess powerful superpowers---linear algebra, coordinate systems, algorithms, complexity thinking, and debugging intuition. This guide translates every lecture in the MSM repository into those mental models. For every topic, you will see: (1) the real problem being solved, (2) \textbf{why the naive or 1D approach fails}, (3) \textbf{the geometric engine behind why the right method works}, and (4) \textbf{when even the standard method breaks and what to use instead}.
+
+\tableofcontents
+\newpage
+
+% ============================================================================
+\section{The Rosetta Stone: One Mental Model for the Whole Course}
+% ============================================================================
+
+Before diving into Lecture P01, step back and look at the entire semester from 10,000 meters. Math students spend years internalizing notation until formulas feel obvious. If you only take one math course per semester, those same formulas look like a wall of Greek letters. The table below bridges that gap immediately.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{4.3cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{MSM Symbol} & \textbf{Math-Major Reading} & \textbf{CS / Geometric Meaning} \\
+\midrule
+$\mathbf{x} \in \mathbb{R}^p$ & Realization of a $p$-dim random vector & One record (row) with $p$ numeric features; a single point in $p$-dimensional space. \\
+$\mathbf{X} \in \mathbb{R}^{n \times p}$ & Data matrix & A DataFrame with $n$ rows (samples) and $p$ columns (features). \\
+$\boldsymbol{\mu} = \mathbb{E}[\mathbf{X}]$ & Expectation vector & The center of mass (centroid) of the data cloud. \\
+$\boldsymbol{\Sigma} \in \mathbb{R}^{p \times p}$ & Covariance matrix & The \emph{shape and tilt} of the data cloud: diagonal = stretch along axes; off-diagonal = rotation/shear. \\
+$\boldsymbol{\Sigma}^{-1}$ & Precision / inverse covariance matrix & The \emph{un-stretcher}: undoes scale and correlation so a tilted ellipsoid becomes a unit sphere. \\
+$(\mathbf{x}-\boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu})$ & Quadratic form (Mahalanobis $D_M^2$) & Squared Euclidean distance \emph{after} whitening the space into a standard unit sphere. \\
+$\mathbf{u}^\top \mathbf{v}$ & Inner product & Dot product: measures alignment. Zero means orthogonal (geometrically uncorrelated). \\
+Degrees of freedom ($\text{df}$) & Dimension of residual subspace & How many independent numbers remain after spending parameters to estimate means or slopes. \\
+$p$-value & Tail probability under $H_0$ & ``If nothing interesting is going on, how often would random noise produce a result at least this extreme?'' \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{The Single Unifying Idea Behind Lectures P01--P12}
+
+If you remember only one geometric picture from this entire document, remember this: \textbf{a cloud of correlated multivariate data looks like a tilted, stretched American football (an ellipsoid), not a round basketball (a sphere).}
+
+In 1D statistics, you standardize a number $x$ with a $z$-score: $z = (x - \mu)/\sigma$. You shift to the center ($\mu$) and divide by the spread ($\sigma$). In $p$ dimensions, you cannot simply divide each feature by its own standard deviation $\sigma_j$, because features are \emph{correlated}---the ellipsoid is tilted diagonally!
+
+Instead, the multivariate equivalent of dividing by $\sigma^2$ is multiplying by $\boldsymbol{\Sigma}^{-1}$:
+\[
+    z^2 = \frac{(x - \mu)^2}{\sigma^2}
+    \qquad \Longrightarrow \qquad
+    D_M^2(\mathbf{x}) = (\mathbf{x} - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x} - \boldsymbol{\mu}).
+\]
+Think of $\boldsymbol{\Sigma}$ as a linear transformation matrix that stretched and rotated a unit sphere into your data's ellipsoid. Multiplying by $\boldsymbol{\Sigma}^{-1/2}$ reverses that transformation (\textbf{whitening}), turning the tilted ellipsoid back into a clean unit sphere where every axis has variance $1$ and zero correlation.
+
+Watch how this \emph{one} idea unlocks almost the entire course:
+\begin{itemize}
+    \item \textbf{P02 (Multivariate Normal):} The bell curve's exponent is literally $-\frac{1}{2} D_M^2(\mathbf{x})$. Points of equal probability density lie on concentric ellipsoids!
+    \item \textbf{P03 (Generating Data):} To generate correlated data, run whitening in \emph{reverse}: take spherical white noise $\mathbf{z} \sim N(\mathbf{0}, \mathbf{I})$ and stretch/tilt it using the Cholesky factor $\mathbf{L}$ where $\boldsymbol{\Sigma} = \mathbf{L}\mathbf{L}^\top$.
+    \item \textbf{P05 (Outliers):} A multivariate outlier is a point with a huge $D_M^2(\mathbf{x})$---far from the center \emph{relative to the ellipsoid's shape}, even if every single coordinate looks normal on its own.
+    \item \textbf{P06 (Hotelling's $T^2$):} Testing whether a sample mean vector $\bar{\mathbf{x}}$ equals $\boldsymbol{\mu}_0$ is literally measuring the Mahalanobis distance between $\bar{\mathbf{x}}$ and $\boldsymbol{\mu}_0$.
+    \item \textbf{P11 (PCA) \& P12 (LDA/QDA):} PCA finds the principal axes (eigenvectors) of $\boldsymbol{\Sigma}$; LDA and QDA classify new points by asking which class centroid is closest in Mahalanobis distance!
+\end{itemize}
+
+\subsection{Course Roadmap (\texttt{zcu-sediva/MSM})}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.2cm} >{\raggedright\arraybackslash}p{3.9cm} >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Unit} & \textbf{Repo Topic} & \textbf{Core Question} & \textbf{Why Naive Methods Fail} \\
+\midrule
+P01 & Random vectors & How do variables behave together? & Marginals completely hide joint dependence. \\
+P02 & Discrete \& MVN & What are the canonical joint shapes? & Uncorrelated $\neq$ independent (except in MVN). \\
+P03 & Data simulation & How to synthesize correlated data? & Generating columns independently destroys $\boldsymbol{\Sigma}$. \\
+P04 & Multivariate EDA & How to summarize \& see $p$-D data? & 2D/3D intuition collapses (Curse of Dim.). \\
+P05 & Outliers & Which records are genuinely anomalous? & 1D checks miss joint anomalies; outliers corrupt $\mathbf{S}$. \\
+P06 & Mean vector tests & Does $\boldsymbol{\mu} = \boldsymbol{\mu}_0$ or $\boldsymbol{\mu}_1 = \boldsymbol{\mu}_2$? & Multiple $t$-tests inflate errors \& ignore $\boldsymbol{\Sigma}$. \\
+P07 & ANOVA / ANCOVA & Do $k \ge 3$ groups differ in mean? & Pairwise $t$-tests explode false positives. \\
+P08 & Contingency tables & Are categorical features associated? & $\chi^2$ breaks on small counts; $p$-value $\neq$ strength. \\
+P09 & Correlation \& copulas & How strongly \& in tails do vars move? & Pearson misses curves \& joint extreme crashes. \\
+P10 & Multiple regression & Predict $Y$ from $X_1, \dots, X_p$. & Collinear features make $(\mathbf{X}^\top\mathbf{X})^{-1}$ explode. \\
+P11 & Dim.\ reduction & Compress $p$ features keeping structure. & Unscaled PCA is hijacked; linear PCA misses curves. \\
+P12 & Discriminant analysis & Separate labeled classes optimally. & Unsupervised PCA can crush class separation. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\newpage
+
+% ============================================================================
+\section{P01: Random Vectors \& Multidimensional Distributions}
+% ============================================================================
+\emph{Repository folder: \texttt{P01 vicerozmerne rozdeleni} (\texttt{P01a\_uvod.pdf}, \texttt{P01b\_nahodny\_vektor.pdf}).}
+
+\subsection{The Core Problem \& CS Intuition}
+In introductory statistics, you analyze one column at a time: CPU temperature, or server latency, or user age. Real systems never work in isolation. A single observation is a \textbf{random vector}:
+\[
+    \mathbf{X} = (X_1, X_2, \dots, X_p)^\top.
+\]
+Think of $\mathbf{X}$ as a struct or JSON object whose fields are filled by a random experiment. The central shift in P01 is moving from a 1D probability curve $f(x)$ to a \textbf{joint probability landscape} $f(x_1, \dots, x_p)$---a mountain range sitting over a $p$-dimensional floor where the total volume under the mountain equals $1$.
+
+Three operations slice this mountain range, and they map cleanly to SQL/DataFrame queries:
+\begin{itemize}
+    \item \textbf{Joint distribution} $f_{X,Y}(x, y)$ (or $P(X=x, Y=y)$): The full 2D probability table or surface. Answers: ``What is the probability that \emph{both} $X=x$ AND $Y=y$ happen simultaneously?''
+    \item \textbf{Marginal distribution} $f_X(x) = \int_{-\infty}^{\infty} f_{X,Y}(x,y)\,dy$ (or summing over $y$): Literally a \texttt{GROUP BY X} aggregation that projects the 2D mountain onto the $X$-wall, forgetting $Y$ completely. The name ``marginal'' comes from writing row and column totals in the \emph{margins} of a 2D table.
+    \item \textbf{Conditional distribution} $f_{Y|X}(y \mid x) = \frac{f_{X,Y}(x,y)}{f_X(x)}$: Literally a \texttt{WHERE X = x} filter! You slice the mountain range with a vertical knife at $X = x$, then rescale that slice by dividing by $f_X(x)$ so the slice's area equals $1$ again.
+\end{itemize}
+
+\subsection{Independence vs.\ Dependence}
+Two variables $X$ and $Y$ are \textbf{independent} if and only if knowing $X$ tells you zero new information about $Y$:
+\[
+    f_{X,Y}(x, y) = f_X(x) \cdot f_Y(y) \quad \text{for all } x, y
+    \qquad \Longleftrightarrow \qquad
+    f_{Y|X}(y \mid x) = f_Y(y).
+\]
+Geometrically, independence means every vertical slice of the joint mountain has the \emph{exact same shape} (just scaled up or down by $f_X(x)$). In matrix terms for discrete tables, the joint probability matrix has \textbf{rank 1}: it is the outer product $\mathbf{p}_X \mathbf{p}_Y^\top$.
+
+\textcolor{crimson}{\textbf{Why Naive Marginal Analysis Fails:}} You can have two datasets with the \emph{exact same} marginal distributions $f_X(x)$ and $f_Y(y)$---identical histograms, identical means, identical variances---yet completely opposite joint realities! Imagine two servers whose CPU load $X$ and memory load $Y$ are both $50\%$ on average. In System A, they spike at the exact same moment (causing crashes). In System B, whenever CPU spikes, memory is idle (safe). Looking at marginal columns one by one makes System A and System B look identical.
+
+\subsection{The Math Decoded: Expectation Vector, Covariance, and Correlation Matrices}
+Instead of tracking an entire $p$-dimensional density function, we often summarize its first two moments:
+\begin{enumerate}
+    \item \textbf{Expectation vector:} $\boldsymbol{\mu} = \mathbb{E}[\mathbf{X}] = (\mathbb{E}[X_1], \dots, \mathbb{E}[X_p])^\top$. Just the column-wise center of mass.
+    \item \textbf{Covariance matrix:} $\boldsymbol{\Sigma} = \operatorname{Cov}(\mathbf{X}) = \mathbb{E}\big[(\mathbf{X} - \boldsymbol{\mu})(\mathbf{X} - \boldsymbol{\mu})^\top\big]$, whose $(i,j)$-th entry is:
+    \[
+        \sigma_{ij} = \operatorname{Cov}(X_i, X_j) = \mathbb{E}\big[(X_i - \mu_i)(X_j - \mu_j)\big].
+    \]
+    On the diagonal ($i=j$), $\sigma_{ii} = \operatorname{Var}(X_i) = \sigma_i^2$. Off the diagonal ($i \neq j$), $\sigma_{ij} > 0$ means $X_i$ and $X_j$ tend to move above their means together; $\sigma_{ij} < 0$ means when one rises, the other tends to fall.
+    \item \textbf{Correlation matrix:} $\mathbf{R}$, whose entries are $\rho_{ij} = \frac{\sigma_{ij}}{\sigma_i \sigma_j} \in [-1, 1]$, with $1$s on the diagonal. Equivalently, $\mathbf{R} = \mathbf{D}^{-1}\boldsymbol{\Sigma}\mathbf{D}^{-1}$, where $\mathbf{D} = \operatorname{diag}(\sigma_1, \dots, \sigma_p)$.
+\end{enumerate}
+
+\textbf{Why do we need both $\boldsymbol{\Sigma}$ and $\mathbf{R}$?} Covariance depends on physical units. If $X_1$ is height in \emph{meters}, multiplying $X_1$ by $100$ to get \emph{centimeters} multiplies $\operatorname{Var}(X_1)$ by $10{,}000$ and $\operatorname{Cov}(X_1, X_2)$ by $100$! You cannot look at $\operatorname{Cov}(X_1, X_2) = 420$ and tell whether the relationship is strong or weak. Correlation divides out the units, making relationships comparable across totally different scales.
+
+\subsection{Why $\boldsymbol{\Sigma}$ Must Be Symmetric and Positive Semi-Definite (PSD)}
+Math slides love stating ``$\boldsymbol{\Sigma}$ is symmetric and positive semi-definite'' as if it were an arbitrary axiom. Here is the plain reason why it \emph{has} to be true:
+\begin{itemize}
+    \item \textbf{Symmetry ($\boldsymbol{\Sigma} = \boldsymbol{\Sigma}^\top$):} Multiplication commutes, so $(X_i - \mu_i)(X_j - \mu_j) = (X_j - \mu_j)(X_i - \mu_i)$.
+    \item \textbf{Positive Semi-Definiteness ($\mathbf{a}^\top \boldsymbol{\Sigma} \mathbf{a} \ge 0$ for every vector $\mathbf{a} \in \mathbb{R}^p$):} Pick \emph{any} direction $\mathbf{a}$ and project your random vector onto it to get a 1D scalar random variable $Y = \mathbf{a}^\top \mathbf{X} = a_1 X_1 + \dots + a_p X_p$. What is the variance of $Y$?
+    \[
+        \operatorname{Var}(\mathbf{a}^\top \mathbf{X}) = \mathbf{a}^\top \boldsymbol{\Sigma} \mathbf{a}.
+    \]
+    Since a 1D variance can \emph{never} be negative, $\mathbf{a}^\top \boldsymbol{\Sigma} \mathbf{a}$ must be $\ge 0$ for every possible direction $\mathbf{a}$! If $\mathbf{a}^\top \boldsymbol{\Sigma} \mathbf{a} = 0$ for some non-zero $\mathbf{a}$, that means $\mathbf{a}^\top \mathbf{X}$ is constant---one feature is an exact linear combination of the others (linear redundancy, singular $\boldsymbol{\Sigma}$, zero eigenvalue).
+\end{itemize}
+Because $\boldsymbol{\Sigma}$ is symmetric and PSD, the Spectral Theorem guarantees it has \textbf{real, non-negative eigenvalues} $\lambda_1 \ge \dots \ge \lambda_p \ge 0$ and \textbf{orthogonal eigenvectors}. That single fact is what makes Cholesky decomposition (P03), Mahalanobis distance (P02/P05), and PCA (P11) mathematically possible!
+
+% ============================================================================
+\section{P02: Discrete Multivariate \& Multivariate Normal Distributions}
+% ============================================================================
+\emph{Repository folder: \texttt{P02 priklady} (\texttt{P02a\_diskretni\_rozdeleni.pdf}, \texttt{P02b\_normalni\_rozdeleni.pdf}, \texttt{hustota2d.ipynb}).}
+
+\subsection{Discrete Multivariate Models: Counting Categories Together}
+When you roll a $k$-sided die $n$ times independently, the vector of counts $\mathbf{X} = (X_1, \dots, X_k)^\top$ follows the \textbf{Multinomial distribution} $\operatorname{Mult}(n; p_1, \dots, p_k)$:
+\[
+    P(X_1 = x_1, \dots, X_k = x_k) = \frac{n!}{x_1! x_2! \cdots x_k!} p_1^{x_1} p_2^{x_2} \cdots p_k^{x_k}, \qquad \sum_{i=1}^k x_i = n.
+\]
+\textbf{Notice a subtle constraint:} Because the counts must sum to $n$, the components are \emph{always negatively correlated}: $\operatorname{Cov}(X_i, X_j) = -n p_i p_j < 0$ for $i \neq j$. Why? If you get more 6s in 100 rolls, there are fewer rolls left to be 1s! Also, because $X_k = n - \sum_{i=1}^{k-1} X_i$, the covariance matrix of all $k$ counts is \textbf{singular} (rank $k-1$).
+
+If instead you draw $n$ items \emph{without replacement} from a finite pool of size $N$ containing $M_1, \dots, M_k$ items of each type, you get the \textbf{Multivariate Hypergeometric distribution}. As $N \to \infty$ with $M_i/N \to p_i$, drawing without replacement barely changes the pool, so it converges to the Multinomial.
+
+\subsection{The Multivariate Normal Distribution (MVN): Decoding the Formula}
+The Multivariate Normal distribution $\mathbf{X} \sim N_p(\boldsymbol{\mu}, \boldsymbol{\Sigma})$ (with positive definite $\boldsymbol{\Sigma}$) is the cornerstone of classical MSM. Its density looks intimidating until you split it into two parts:
+\[
+    f(\mathbf{x}) = \underbrace{\frac{1}{(2\pi)^{p/2} |\boldsymbol{\Sigma}|^{1/2}}}_{\text{Normalization constant}}
+    \exp\!\Bigg( -\frac{1}{2} \underbrace{(\mathbf{x} - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x} - \boldsymbol{\mu})}_{D_M^2(\mathbf{x}): \text{ squared Mahalanobis distance}} \Bigg).
+\]
+Let's decode every single piece:
+\begin{itemize}
+    \item \textbf{Inside the exponent:} $D_M^2(\mathbf{x}) = (\mathbf{x} - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{x} - \boldsymbol{\mu})$. Notice that $f(\mathbf{x})$ depends on $\mathbf{x}$ \emph{only} through $D_M^2(\mathbf{x})$! Therefore, every point $\mathbf{x}$ with the same Mahalanobis distance $D_M^2(\mathbf{x}) = c^2$ has the \emph{exact same} density. In 2D, these constant-density contours are ellipses; in $p$D, hyper-ellipsoids.
+    \item \textbf{Why $|\boldsymbol{\Sigma}|^{1/2}$ is in the denominator:} The determinant $|\boldsymbol{\Sigma}| = \det(\boldsymbol{\Sigma}) = \prod_{j=1}^p \lambda_j$ measures the squared volume scaling factor of the ellipsoid. When you stretch a probability mountain out over a larger floor area (bigger $|\boldsymbol{\Sigma}|^{1/2}$), you must lower its peak by dividing by $|\boldsymbol{\Sigma}|^{1/2}$ so the total volume stays equal to $1$.
+    \item \textbf{Eigenvectors and eigenvalues define the ellipse:} Write $\boldsymbol{\Sigma} = \mathbf{Q}\boldsymbol{\Lambda}\mathbf{Q}^\top$. The eigenvectors (columns of $\mathbf{Q}$) point along the major and minor axes of the ellipse. The half-length of axis $j$ for contour $D_M^2(\mathbf{x}) = c^2$ is $c\sqrt{\lambda_j}$.
+\end{itemize}
+
+\subsection{Why Statisticians Are Obsessed with the MVN (Its Four Superpowers)}
+In 1D, the Central Limit Theorem makes averages normal. In $p$D, the Multivariate CLT makes sample mean vectors asymptotically MVN. Even better, MVN is algebraically ``closed'' under almost every linear operation you perform in data science:
+\begin{enumerate}
+    \item \textbf{Linear transformations stay MVN:} If $\mathbf{X} \sim N_p(\boldsymbol{\mu}, \boldsymbol{\Sigma})$, then $\mathbf{A}\mathbf{X} + \mathbf{b} \sim N_q(\mathbf{A}\boldsymbol{\mu} + \mathbf{b}, \mathbf{A}\boldsymbol{\Sigma}\mathbf{A}^\top)$. Projections, rotations, and rescalings never leave the MVN family.
+    \item \textbf{Marginals stay Normal:} Dropping columns from $\mathbf{X}$ gives another MVN whose mean and covariance are simply the corresponding sub-vector and sub-matrix.
+    \item \textbf{Conditionals stay Normal (Linear Regression pops out automatically!):} Partition $\mathbf{X} = (\mathbf{X}_1, \mathbf{X}_2)^\top$. Given $\mathbf{X}_2 = \mathbf{x}_2$, the conditional distribution $\mathbf{X}_1 \mid \mathbf{X}_2 = \mathbf{x}_2$ is still MVN with:
+    \[
+        \boldsymbol{\mu}_{1|2} = \boldsymbol{\mu}_1 + \boldsymbol{\Sigma}_{12}\boldsymbol{\Sigma}_{22}^{-1}(\mathbf{x}_2 - \boldsymbol{\mu}_2),
+        \qquad
+        \boldsymbol{\Sigma}_{1|2} = \boldsymbol{\Sigma}_{11} - \boldsymbol{\Sigma}_{12}\boldsymbol{\Sigma}_{22}^{-1}\boldsymbol{\Sigma}_{21}.
+    \]
+    Read that intuitively: observing $\mathbf{X}_2$ shifts your best guess of $\mathbf{X}_1$ linearly by the cross-covariance $\boldsymbol{\Sigma}_{12}\boldsymbol{\Sigma}_{22}^{-1}$, and \emph{shrinks} your remaining uncertainty by subtracting $\boldsymbol{\Sigma}_{12}\boldsymbol{\Sigma}_{22}^{-1}\boldsymbol{\Sigma}_{21}$!
+    \item \textbf{Mahalanobis distance follows $\chi_p^2$:} If $\mathbf{X} \sim N_p(\boldsymbol{\mu}, \boldsymbol{\Sigma})$, then whitening gives $\mathbf{Z} = \boldsymbol{\Sigma}^{-1/2}(\mathbf{X}-\boldsymbol{\mu}) \sim N_p(\mathbf{0}, \mathbf{I})$, so
+    \[
+        D_M^2(\mathbf{X}) = \mathbf{Z}^\top \mathbf{Z} = \sum_{j=1}^p Z_j^2 \sim \chi_p^2.
+    \]
+    This exact result gives us the outlier cutoff threshold in P05 and confidence ellipsoids in P06!
+\end{enumerate}
+
+\subsection{Two Classic Traps That Catch Almost Everyone}
+\textcolor{crimson}{\textbf{Trap 1: ``Uncorrelated means Independent'' --- FALSE in general!}}
+Independence always implies $\operatorname{Cov}(X, Y) = 0$. The reverse is \textbf{false}. Let $X \sim N(0,1)$ and define $Y = X^2$. Clearly $Y$ is 100\% deterministically controlled by $X$! Yet $\operatorname{Cov}(X, X^2) = \mathbb{E}[X^3] - \mathbb{E}[X]\mathbb{E}[X^2] = 0 - 0 = 0$. Why? Because covariance only measures \emph{linear} symmetry; the positive slope on the right cancels the negative slope on the left. \textbf{Special exception:} If $(X, Y)$ are \emph{jointly} Multivariate Normal, then $\rho = 0$ DOES imply independence (because $\boldsymbol{\Sigma}$ becomes diagonal, so the exponential factors cleanly into $f_X(x) f_Y(y)$).
+
+\textcolor{crimson}{\textbf{Trap 2: ``Both marginals are Normal, so the joint distribution is MVN'' --- FALSE!}}
+Knowing $X \sim N(0,1)$ and $Y \sim N(0,1)$ does \emph{not} guarantee $(X,Y)$ is bivariate normal! For instance, let $X \sim N(0,1)$ and flip a fair coin $S \in \{-1, +1\}$; set $Y = S \cdot X$. Marginally, $Y$ is perfectly $N(0,1)$. Jointly, all points lie exclusively on the giant ``X'' formed by the lines $y = x$ and $y = -x$---nothing like a smooth 2D Gaussian bell! This is why checking histograms column-by-column is never enough to verify multivariate normality.
+
+% ============================================================================
+\section{P03: Generating \& Simulating Multidimensional Data}
+% ============================================================================
+\emph{Repository folder: \texttt{P03 generovani vicerozmernych dat} (\texttt{P03\_generovani\_long.pdf}, \texttt{P03\_simulovani.pdf}).}
+
+\subsection{The Core Problem \& CS Intuition}
+Every pseudorandom number generator (PRNG) in your CPU or language runtime (Mersenne Twister, PCG, Philox) produces one thing: independent uniform numbers $U_1, U_2, \dots \sim U(0,1)$. How do you turn a stream of independent uniform floats into realistic \emph{correlated} multidimensional synthetic data (for Monte Carlo simulations, stress-testing financial portfolios, or bootstrapping)?
+
+\subsection{Step 1: Generating Independent 1D Building Blocks}
+\begin{itemize}
+    \item \textbf{Inverse Transform Sampling:} If a target distribution has CDF $F(x)$ and inverse $F^{-1}(u)$, then $X = F^{-1}(U)$ has distribution $F$. Why? Because $P(F^{-1}(U) \le x) = P(U \le F(x)) = F(x)$! Think of $U \in (0,1)$ as picking a random percentile and $F^{-1}(U)$ as looking up the value at that percentile.
+    \item \textbf{Box-Muller Transform (for $N(0,1)$):} The Gaussian CDF $\Phi(x)$ has no closed-form elementary inverse. Box-Muller cleverly uses 2D polar coordinates: take $U_1, U_2 \sim U(0,1)$ and compute
+    \[
+        Z_1 = \sqrt{-2 \ln U_1}\cos(2\pi U_2), \qquad Z_2 = \sqrt{-2 \ln U_1}\sin(2\pi U_2).
+    \]
+    Geometrically, $\sqrt{-2\ln U_1}$ draws a Rayleigh radius (since $Z_1^2 + Z_2^2 \sim \chi_2^2 = \operatorname{Exp}(1/2)$) and $2\pi U_2$ picks a uniform random angle on the circle! Result: two exact, independent $N(0,1)$ samples.
+\end{itemize}
+
+\subsection{Step 2: Injecting Correlation via Cholesky Decomposition}
+\textcolor{crimson}{\textbf{Why Naive Generation Fails:}} If you generate $X_1 \sim N(\mu_1, \sigma_1^2)$ and $X_2 \sim N(\mu_2, \sigma_2^2)$ independently, you get a circle/axis-aligned ellipse with zero correlation ($\sigma_{12} = 0$). Any downstream simulation (like portfolio crash risk or joint sensor failure) will severely underestimate simultaneous extreme events.
+
+\textbf{Why Cholesky Works (Reverse Whitening):} Suppose we want $\mathbf{X} \sim N_p(\boldsymbol{\mu}, \boldsymbol{\Sigma})$ with positive definite $\boldsymbol{\Sigma}$. Compute the \textbf{Cholesky decomposition}---the lower-triangular ``matrix square root'' $\mathbf{L}$ such that
+\[
+    \boldsymbol{\Sigma} = \mathbf{L}\mathbf{L}^\top.
+\]
+Now draw $p$ independent standard normals $\mathbf{Z} \sim N_p(\mathbf{0}, \mathbf{I})$ and compute:
+\[
+    \mathbf{X} = \boldsymbol{\mu} + \mathbf{L}\mathbf{Z}.
+\]
+Verify the covariance in one line of algebra:
+\[
+    \operatorname{Cov}(\mathbf{X}) = \operatorname{Cov}(\mathbf{L}\mathbf{Z}) = \mathbf{L}\operatorname{Cov}(\mathbf{Z})\mathbf{L}^\top = \mathbf{L}\mathbf{I}\mathbf{L}^\top = \mathbf{L}\mathbf{L}^\top = \boldsymbol{\Sigma}.
+\]
+Because $\mathbf{L}$ is lower-triangular, this has a crystal-clear intuitive meaning in 2D (with unit variances and correlation $\rho$):
+\[
+    X_1 = Z_1, \qquad X_2 = \rho Z_1 + \sqrt{1 - \rho^2}\, Z_2.
+\]
+Look at $X_2$: it takes a $\rho$-fraction of $X_1$'s signal and mixes in $\sqrt{1-\rho^2}$ of fresh independent noise $Z_2$, preserving total variance $\rho^2 + (1-\rho^2) = 1$!
+
+\textbf{Cholesky vs.\ Spectral (Eigen) Decomposition:}
+\begin{itemize}
+    \item \textbf{Cholesky ($\mathbf{L}\mathbf{L}^\top$):} Fast ($O(p^3/3)$ flops), numerically crisp, \emph{but} strictly requires $\boldsymbol{\Sigma}$ to be positive definite (all $\lambda_j > 0$). If two variables are perfectly collinear ($\det(\boldsymbol{\Sigma}) = 0$), Cholesky crashes with a non-positive-definite error.
+    \item \textbf{Eigendecomposition / SVD ($\boldsymbol{\Sigma} = \mathbf{Q}\boldsymbol{\Lambda}\mathbf{Q}^\top$):} Set $\mathbf{A} = \mathbf{Q}\boldsymbol{\Lambda}^{1/2}$ and $\mathbf{X} = \boldsymbol{\mu} + \mathbf{A}\mathbf{Z}$. Slower to compute, \emph{but} gracefully handles singular (positive semi-definite) covariance matrices by setting $\sqrt{\lambda_j} = 0$ for redundant dimensions!
+\end{itemize}
+
+\subsection{Simulating Beyond MVN \& Monte Carlo Intuition}
+What if the target joint density $f(\mathbf{x})$ is \emph{not} Gaussian?
+\begin{itemize}
+    \item \textbf{Conditional Factorization (Chain Rule):} Factor $f(x_1, x_2, \dots, x_p) = f(x_1) f(x_2 \mid x_1) \cdots f(x_p \mid x_1, \dots, x_{p-1})$. Draw $x_1$, plug it into the conditional distribution to draw $x_2$, and continue sequentially.
+    \item \textbf{Acceptance-Rejection Sampling:} Enclose your complex target mountain $f(\mathbf{x})$ inside a simpler envelope $M \cdot g(\mathbf{x}) \ge f(\mathbf{x})$. Sample a candidate $\mathbf{x} \sim g$ and a random height $u \sim U(0, M g(\mathbf{x}))$; accept $\mathbf{x}$ if $u \le f(\mathbf{x})$, else discard and retry. \emph{Warning:} In high dimensions, the acceptance rate $1/M$ decays exponentially toward $0$ (Curse of Dimensionality!), which is why modern high-dimensional simulation switches to MCMC or Copulas (P09).
+    \item \textbf{Monte Carlo Estimation:} To compute an impossible $p$-dimensional integral $I = \mathbb{E}[h(\mathbf{X})]$, simply simulate $N$ vectors $\mathbf{X}^{(1)}, \dots, \mathbf{X}^{(N)}$ and average $\hat{I}_N = \frac{1}{N}\sum_{i=1}^N h(\mathbf{X}^{(i)})$. Its standard error shrinks as $\sigma / \sqrt{N}$---crucially, \textbf{independent of dimension $p$}! To cut error in half, you need $4\times$ as many samples, whether $p=2$ or $p=200$.
+\end{itemize}
+
+% ============================================================================
+\section{P04: Exploring Multidimensional Data \& The Curse of Dimensionality}
+% ============================================================================
+\emph{Repository folder: \texttt{P04 vicerozmerna data} (\texttt{P04\_vicerozmerna\_data\_long.pdf}, \texttt{P04\_vicerozmerna\_data.ipynb}).}
+
+\subsection{Sample Estimators \& Why We Divide by $n-1$}
+Given a real dataset $\mathbf{X} \in \mathbb{R}^{n \times p}$ (rows $\mathbf{x}_1^\top, \dots, \mathbf{x}_n^\top$), we estimate the unknown population parameters $(\boldsymbol{\mu}, \boldsymbol{\Sigma})$ using:
+\[
+    \bar{\mathbf{x}} = \frac{1}{n}\sum_{i=1}^n \mathbf{x}_i,
+    \qquad
+    \mathbf{S} = \frac{1}{n-1}\sum_{i=1}^n (\mathbf{x}_i - \bar{\mathbf{x}})(\mathbf{x}_i - \bar{\mathbf{x}})^\top
+    = \frac{1}{n-1} \mathbf{X}_c^\top \mathbf{X}_c,
+\]
+where $\mathbf{X}_c$ is the centered data matrix (column means subtracted).
+
+\textbf{Why $n-1$ instead of $n$?} Because we don't know the true $\boldsymbol{\mu}$, we plugged in the sample mean $\bar{\mathbf{x}}$ computed from the \emph{same} data. By definition, $\bar{\mathbf{x}}$ sits right in the middle of our particular sample, making the sample deviations $(\mathbf{x}_i - \bar{\mathbf{x}})$ systematically slightly smaller than the true deviations $(\mathbf{x}_i - \boldsymbol{\mu})$. Equivalently, once you know $\bar{\mathbf{x}}$ and the first $n-1$ residuals, the $n$-th residual is forced because $\sum (\mathbf{x}_i - \bar{\mathbf{x}}) = \mathbf{0}$. Dividing by $n-1$ corrects this downward bias so $\mathbb{E}[\mathbf{S}] = \boldsymbol{\Sigma}$. (Notice also: if $n \le p$, the rank of $\mathbf{X}_c^\top \mathbf{X}_c$ is at most $n-1 < p$, so $\mathbf{S}$ is guaranteed to be \textbf{singular} and non-invertible!)
+
+\subsection{Measuring Overall Multivariate Spread: Trace vs.\ Determinant}
+How do you summarize the total ``spread'' of a $p \times p$ covariance matrix $\mathbf{S}$ with a single number? There are two classic summaries, and they measure completely different things:
+\begin{itemize}
+    \item \textbf{Total Variance:} $\operatorname{tr}(\mathbf{S}) = \sum_{j=1}^p s_{jj} = \sum_{j=1}^p \lambda_j$. Sum of individual feature variances. \emph{Blind spot:} Completely ignores correlations! Two identical variances have the same trace whether $\rho = 0$ (big round cloud) or $\rho = 0.999$ (razor-thin line).
+    \item \textbf{Generalized Variance:} $\det(\mathbf{S}) = \prod_{j=1}^p \lambda_j$. Proportional to the squared \textbf{volume} of the data ellipsoid! If two variables are nearly collinear, the ellipsoid flattens into a pancake and $\det(\mathbf{S}) \to 0$. \emph{Blind spot:} A single redundant column (one $\lambda_p = 0$) collapses $\det(\mathbf{S})$ to $0$ even if the other $99$ dimensions have massive variance.
+\end{itemize}
+
+\subsection{Standardization vs.\ Whitening}
+\begin{itemize}
+    \item \textbf{Standardization ($Z$-scoring):} $z_{ij} = (x_{ij} - \bar{x}_j)/s_j$. Centers every column at $0$ and scales its variance to $1$. Removes unit mismatch (meters vs.\ kilograms), \textbf{but keeps correlations untouched}.
+    \item \textbf{Whitening (Sphering):} $\mathbf{w}_i = \mathbf{S}^{-1/2}(\mathbf{x}_i - \bar{\mathbf{x}})$. Removes unit mismatch \emph{and} removes all linear correlations, so the sample covariance of $\mathbf{W}$ becomes the identity matrix $\mathbf{I}_p$.
+\end{itemize}
+
+\subsection{Visualizing High-Dimensional Data}
+Our eyes only see 2D/3D cleanly, so EDA in MSM uses specialized visual projections:
+\begin{itemize}
+    \item \textbf{Scatter Plot Matrix (Pairplot):} Grid of all $\binom{p}{2}$ 2D scatter plots, with histograms/KDEs on the diagonal. Great for $p \le 8$; unreadable for $p = 50$ ($1{,}225$ panels!).
+    \item \textbf{Parallel Coordinates:} Draw $p$ vertical parallel axes side by side; each data point $\mathbf{x}_i \in \mathbb{R}^p$ becomes a polyline zig-zagging across the $p$ axes. Clusters appear as thick bundles of parallel lines; negative correlations appear as dramatic ``X''-shaped crossovers between adjacent axes!
+    \item \textbf{Radar / Star Plots \& Glyphs:} Each point becomes a small star whose $p$ spoke lengths represent feature values. Good for comparing a handful of profiles (e.g., 10 countries), useless for $n = 10{,}000$.
+    \item \textbf{Andrews Curves:} Map each vector $\mathbf{x} = (x_1, \dots, x_p)$ to a Fourier wave $f_{\mathbf{x}}(t) = \frac{x_1}{\sqrt{2}} + x_2 \sin(t) + x_3 \cos(t) + x_4 \sin(2t) + \dots$ on $[-\pi, \pi]$. Because Fourier bases are orthogonal, the $L_2$ distance between two curves equals the Euclidean distance between the points! Clusters show up as tightly braided ribbons.
+\end{itemize}
+
+\subsection{The Curse of Dimensionality (Why Your 3D Intuition Lies)}
+In CS and MSM, high dimension $p$ breaks geometric intuition in three brutal ways:
+\begin{enumerate}
+    \item \textbf{All volume lives in the thin outer crust:} Consider a unit ball of radius $1$ and an inner ball of radius $0.99$. In 2D, the outer $1\%$ rim holds $1 - 0.99^2 \approx 2\%$ of the area. In $p = 100$ dimensions, the outer $1\%$ rim holds $1 - 0.99^{100} \approx 63.4\%$ of the volume; in $p = 500$, it holds $99.3\%$! Nearly every data point sits on the boundary, leaving the core empty.
+    \item \textbf{Exponential data starvation:} To cover a 1D interval $[0,1]$ with $10$ bins of width $0.1$, you need $10$ bins. In $p = 20$ dimensions, a grid of $10$ bins per axis has $10^{20}$ cells! Even with a billion data points, virtually every cell is empty. Local density estimation (histograms, KDE, $k$-NN) starves for neighbors.
+    \item \textbf{Distance concentration:} For independent coordinates, the distance to the \emph{nearest} neighbor and the \emph{farthest} neighbor converge toward the same ratio: $(d_{\max} - d_{\min})/d_{\min} \to 0$ as $p \to \infty$. Every point looks roughly equidistant from every other point---breaking naive Euclidean $k$-NN, clustering, and outlier detectors unless you reduce dimensionality (P11) or select informative features.
+\end{enumerate}
+
+% ============================================================================
+\section{P05: Outliers --- Univariate vs.\ Multivariate Detection}
+% ============================================================================
+\emph{Repository folder: \texttt{P05 outliers} (\texttt{P05a\_odlehla\_jednorozmerna.ipynb}, \texttt{P05b\_odlehla\_vicerozmerna.ipynb}, \texttt{mammography.csv}).}
+
+\subsection{Univariate Detection \& Why Mean/SD Can Sabotage Itself}
+In 1D, the textbook rule flags $|z_i| = |x_i - \bar{x}|/s > 3$. \textcolor{crimson}{\textbf{Why this fails even in 1D:}} Both $\bar{x}$ and $s$ have a \textbf{breakdown point of $0\%$}: a single extreme typo (e.g., typing $9999$ instead of $99$) drags $\bar{x}$ upward and explodes $s$ so much that the outlier's own $z$-score shrinks below $3$!
+
+\textbf{Robust 1D fixes:}
+\begin{itemize}
+    \item \textbf{Tukey's IQR Fences (Boxplot rule):} Flag points outside $[Q_1 - 1.5\cdot\text{IQR},\; Q_3 + 1.5\cdot\text{IQR}]$, where $\text{IQR} = Q_3 - Q_1$. Quartiles ignore extreme tails (up to $25\%$ contamination).
+    \item \textbf{Modified $Z$-score (MAD):} Replace mean with median and SD with $\text{MAD} = \operatorname{median}(|x_i - \operatorname{median}(x)|)$. Compute $M_i = 0.6745(x_i - \tilde{x})/\text{MAD}$ (flag $|M_i| > 3.5$). Breakdown point is $50\%$---almost half the dataset could be corrupted before the median breaks!
+    \item \textbf{Grubbs' Test:} Formal hypothesis test for a single outlier under normality, checking $\max |x_i - \bar{x}| / s$. Fails if there are \emph{two} or more outliers together (masking!).
+\end{itemize}
+
+\subsection{Why Univariate Checks Completely Miss Multivariate Outliers}
+Suppose human height ($X_1$, mean $175\text{ cm}$, SD $10$) and weight ($X_2$, mean $75\text{ kg}$, SD $12$) are strongly correlated ($\rho = 0.85$). Now consider a record: $(192\text{ cm},\; 54\text{ kg})$.
+\begin{itemize}
+    \item Check height alone: $z_1 = (192 - 175)/10 = +1.7$. Totally ordinary!
+    \item Check weight alone: $z_2 = (54 - 75)/12 = -1.75$. Totally ordinary!
+    \item Check \textbf{jointly} via Mahalanobis distance: Because tall people are almost never that light, this point sits far outside the tilted correlation ellipse! Plugging into $D_M^2 = \frac{1}{1-\rho^2}(z_1^2 - 2\rho z_1 z_2 + z_2^2)$ gives:
+    \[
+        D_M^2 = \frac{1}{1 - 0.85^2}\big(1.7^2 - 2(0.85)(1.7)(-1.75) + (-1.75)^2\big) \approx \frac{11.01}{0.2775} \approx 39.7!
+    \]
+\end{itemize}
+Under a bivariate normal distribution, $D_M^2 \sim \chi_2^2$, whose $99.9\%$ cutoff is just $13.82$. A value of $39.7$ is an astronomical anomaly---yet \emph{every} 1D check gave it a clean bill of health!
+
+\subsection{Masking \& Swamping: How Outliers Hack Your Covariance Matrix}
+So classical Mahalanobis distance $D_M^2(\mathbf{x}_i) = (\mathbf{x}_i - \bar{\mathbf{x}})^\top \mathbf{S}^{-1}(\mathbf{x}_i - \bar{\mathbf{x}})$ solves the correlation problem. \textcolor{crimson}{\textbf{Why classical $D_M^2$ STILL fails:}} If a cluster of $5\%$ outliers sits off to one side, they pull $\bar{\mathbf{x}}$ toward them and stretch the covariance ellipse $\mathbf{S}$ right over themselves! This causes two opposite failures:
+\begin{itemize}
+    \item \textbf{Masking (False Negatives):} The inflated $\mathbf{S}$ swallows the outliers, making their $D_M^2$ look small so you miss them.
+    \item \textbf{Swamping (False Positives):} The tilted, shifted ellipse rotates away from genuine normal points on the opposite flank, making normal points look like outliers.
+\end{itemize}
+
+\subsection{Robust \& Algorithmic Solutions}
+\begin{itemize}
+    \item \textbf{Minimum Covariance Determinant (MCD):} Instead of computing $\bar{\mathbf{x}}$ and $\mathbf{S}$ on all $n$ points, search for the subset of $h$ points (typically $h \approx 0.75n$ or $0.5n$) whose sample covariance matrix has the \textbf{smallest possible determinant} (tightest ellipsoid volume). Outliers are automatically excluded from that tight core! You then compute \emph{robust Mahalanobis distances} using the MCD center and covariance.
+    \item \textbf{Local Outlier Factor (LOF):} What if your data isn't a single ellipsoid (e.g., two clusters of different densities, or a ring shape)? Parametric ellipsoids fail completely. LOF compares a point's local density (distance to its $k$ nearest neighbors) to the local densities of those neighbors. If a point is much sparser than its own neighborhood, $\text{LOF} \gg 1$.
+    \item \textbf{Isolation Forest (CS Favorite):} Recursively slice the feature space with random axis-aligned cuts (random binary trees). Normal points buried deep inside dense clusters require \emph{many} cuts to isolate; outliers sitting alone in empty space get isolated near the root of the tree (short average path length)! Runs in $O(n \log n)$, needs zero Gaussian assumptions, and shines on large imbalanced datasets like \texttt{mammography.csv}.
+\end{itemize}
+
+% ============================================================================
+\section{P06: Hypothesis Tests on Mean Vectors (Hotelling's $T^2$)}
+% ============================================================================
+\emph{Repository folder: \texttt{P06 testy o stredni hodnote} (\texttt{P06\_testy\_o\_stredni\_hodnote\_long.pdf}, \texttt{P06\_iris\_stat\_tests\_full.ipynb}).}
+
+\subsection{Hypothesis Testing as Probabilistic Proof by Contradiction}
+Suppose you have a machine producing components with $p$ measured dimensions, and target spec $\boldsymbol{\mu}_0$, or two species of Iris flowers (\texttt{iris} dataset) with $p=4$ measurements. You want to test $H_0: \boldsymbol{\mu} = \boldsymbol{\mu}_0$ against $H_1: \boldsymbol{\mu} \neq \boldsymbol{\mu}_0$.
+Think of hypothesis testing like an adversarial unit test: assume the boring world ($H_0$) is true, compute a single summary statistic measuring how far your observed data drifted from $H_0$, and calculate the $p$-value (probability of seeing drift at least that big by pure luck). If $p < \alpha$ (typically $0.05$), reject $H_0$.
+
+\subsection{Why Running $p$ Separate $t$-Tests Fails Catastrophically}
+A CS student's natural reflex is a \texttt{for}-loop: run a standard 1D $t$-test on each of the $p$ columns and reject $H_0$ if any column has $p < 0.05$. This breaks for \textbf{two independent reasons}:
+\begin{enumerate}
+    \item \textbf{Family-Wise Error Rate (FWER) Explosion:} Even if $H_0$ is completely true on every feature, each test has a $5\%$ chance of a false alarm. Across $p$ independent tests, the probability of \emph{at least one} false positive is:
+    \[
+        \alpha_{\text{family}} = 1 - (1 - 0.05)^p.
+    \]
+    For $p = 10$ features, $\alpha_{\text{family}} = 40.1\%$! For $p = 50$, it is $92.3\%$! Your loop will scream ``significant difference!'' almost every single time on pure noise.
+    \item \textbf{Correlation Blindness (False Negatives too!):} Even if you fix the multiple-testing problem with Bonferroni ($\alpha / p$), separate $t$-tests draw an axis-aligned \textbf{rectangle} around $\boldsymbol{\mu}_0$, whereas the true uncertainty region of $\bar{\mathbf{x}}$ is a tilted \textbf{ellipsoid}! A sample mean $\bar{\mathbf{x}}$ can sit \emph{inside} every individual 1D confidence interval yet lie completely \emph{outside} the joint confidence ellipsoid---meaning separate $t$-tests fail to detect a real joint shift (loss of power), OR falsely reject a point that lies inside the long tip of the ellipse!
+\end{enumerate}
+
+\subsection{Hotelling's $T^2$: The Exact Multivariate Generalization of $t^2$}
+In 1D, squaring the one-sample $t$-statistic gives:
+\[
+    t^2 = \frac{(\bar{x} - \mu_0)^2}{s^2 / n} = n (\bar{x} - \mu_0)(s^2)^{-1}(\bar{x} - \mu_0).
+\]
+Replace scalars with vectors and $s^2$ with the sample covariance matrix $\mathbf{S}$, and you immediately get \textbf{Hotelling's one-sample $T^2$ statistic}:
+\[
+    T^2 = n (\bar{\mathbf{x}} - \boldsymbol{\mu}_0)^\top \mathbf{S}^{-1} (\bar{\mathbf{x}} - \boldsymbol{\mu}_0).
+\]
+It is literally $n$ times the squared Mahalanobis distance between your sample mean $\bar{\mathbf{x}}$ and the target $\boldsymbol{\mu}_0$! Under $H_0$ and multivariate normality, rescaling $T^2$ maps it onto a standard $F$-distribution:
+\[
+    F = \frac{n - p}{p(n - 1)} T^2 \;\sim\; F_{p,\, n-p}.
+\]
+\textbf{Why does $(n-p)$ appear in the numerator?} Because estimating $p$ means and a $p \times p$ covariance matrix consumes degrees of freedom. Notice that if $n \le p$, $n - p \le 0$ and $\mathbf{S}$ is singular---Hotelling's $T^2$ literally cannot run unless $n > p$!
+
+\textbf{Two-Sample Hotelling's $T^2$ (Comparing two groups, e.g., two Iris species):}
+To test $H_0: \boldsymbol{\mu}_1 = \boldsymbol{\mu}_2$ assuming equal covariance matrices ($\boldsymbol{\Sigma}_1 = \boldsymbol{\Sigma}_2$), pool the two covariance estimates into a weighted average $\mathbf{S}_{\text{pool}} = \frac{(n_1 - 1)\mathbf{S}_1 + (n_2 - 1)\mathbf{S}_2}{n_1 + n_2 - 2}$ and compute:
+\[
+    T^2 = \frac{n_1 n_2}{n_1 + n_2} (\bar{\mathbf{x}}_1 - \bar{\mathbf{x}}_2)^\top \mathbf{S}_{\text{pool}}^{-1} (\bar{\mathbf{x}}_1 - \bar{\mathbf{x}}_2),
+    \qquad
+    \frac{n_1 + n_2 - p - 1}{p(n_1 + n_2 - 2)} T^2 \sim F_{p,\, n_1+n_2-p-1}.
+\]
+\textbf{Paired Two-Sample Case (Before vs.\ After on the same subjects):} Simply compute difference vectors $\mathbf{d}_i = \mathbf{x}_{i,\text{after}} - \mathbf{x}_{i,\text{before}}$ and run the \emph{one-sample} Hotelling's $T^2$ testing $H_0: \boldsymbol{\mu}_d = \mathbf{0}$! Pairing eliminates subject-to-subject baseline variation, hugely increasing power.
+
+\subsection{Assumptions \& When Hotelling's $T^2$ Breaks}
+\begin{itemize}
+    \item \textbf{Multivariate Normality:} Checked via Mardia's skewness/kurtosis or Henze-Zirkler test (or Q-Q plot of $D_M^2$ against $\chi_p^2$). For large $n$, the Multivariate CLT protects $T^2$ against mild non-normality, \emph{unless} heavy outliers are present.
+    \item \textbf{Equal Covariance Matrices (for two-sample):} Checked via \textbf{Box's $M$ test}. Warning: Box's $M$ is notoriously oversensitive to non-normality! If covariances clearly differ and $n_1 \neq n_2$, use the multivariate Welch-style approximation (Nel--van der Merwe / James test) or a \textbf{permutation test} (randomly shuffle group labels 10,000 times and compute how often the shuffled $T^2$ beats your observed $T^2$---a CS student's favorite assumption-free powerhouse!).
+    \item \textbf{Follow-up after rejection:} Hotelling's $T^2$ tells you ``the mean vectors differ somewhere,'' not \emph{which} coordinates caused it. Follow up with simultaneous confidence intervals (Bonferroni or Scheffé/Roy-Bose intervals).
+\end{itemize}
+
+% ============================================================================
+\section{P07: Comparing Multiple Groups --- ANOVA, ANCOVA \& MANOVA}
+% ============================================================================
+\emph{Repository folder: \texttt{P07 ANOVA} (\texttt{P07\_porovnavani\_vice\_skupin.pdf}, \texttt{ANCOVA.csv}, \texttt{ANCOVA\_Analysis\_CZ.ipynb}).}
+
+\subsection{Why Pairwise $t$-Tests Fail for $k$ Groups}
+Suppose you benchmark $k = 6$ sorting/caching algorithms (or $6$ diets) and want to test $H_0: \mu_1 = \mu_2 = \dots = \mu_k$. There are $\binom{k}{2} = \frac{k(k-1)}{2}$ pairs. For $k=6$, that is $15$ pairwise $t$-tests, giving a family-wise false-positive rate up to $1 - 0.95^{15} \approx 54\%$! Worse, each pairwise test only uses data from two groups, throwing away the noise information in the other $k-2$ groups.
+
+\subsection{Why Analysis of \emph{Variance} Tests \emph{Means}}
+Students are always confused by the name: ``Why do we analyze \emph{variance} to compare \emph{means}?'' Picture $k$ groups plotted on a number line. Total variation of all $N$ observations around the grand mean $\bar{y}$ splits cleanly by the Pythagorean theorem (orthogonal decomposition!) into two parts:
+\[
+    \underbrace{\sum_{g=1}^k \sum_{i=1}^{n_g} (y_{gi} - \bar{y})^2}_{SS_{\text{Total}}}
+    =
+    \underbrace{\sum_{g=1}^k n_g (\bar{y}_g - \bar{y})^2}_{SS_{\text{Between}} \text{ (Signal)}}
+    +
+    \underbrace{\sum_{g=1}^k \sum_{i=1}^{n_g} (y_{gi} - \bar{y}_g)^2}_{SS_{\text{Within}} \text{ (Noise)}}.
+\]
+Divide each Sum of Squares by its degrees of freedom to get Mean Squares (variances):
+\[
+    MS_B = \frac{SS_{\text{Between}}}{k - 1},
+    \qquad
+    MS_W = \frac{SS_{\text{Within}}}{N - k},
+    \qquad
+    F = \frac{MS_B}{MS_W} = \frac{\text{Signal Variance (Between Groups)}}{\text{Noise Variance (Within Groups)}}.
+\]
+\textbf{Why this works:}
+\begin{itemize}
+    \item If $H_0$ is true (all groups actually share the same true mean $\mu$), then the group means $\bar{y}_g$ only wobble around $\bar{y}$ due to random sampling jitter. Both $MS_B$ and $MS_W$ estimate the exact same noise variance $\sigma^2$, so $F \approx 1$.
+    \item If at least one group has a genuinely different mean, $MS_B$ inflates by the squared differences between true group means while $MS_W$ stays at $\sigma^2$, pushing $F \gg 1$! Under $H_0$, $F \sim F_{k-1,\, N-k}$.
+\end{itemize}
+
+\subsection{Post-Hoc Tests: Finding \emph{Which} Groups Differ}
+ANOVA is an \textbf{omnibus} (global) alarm bell: if $p < 0.05$, it tells you ``not all groups are equal,'' not which pairs differ. Only \emph{after} ANOVA rejects $H_0$ do you run a controlled post-hoc test:
+\begin{itemize}
+    \item \textbf{Tukey's HSD (Honestly Significant Difference):} Designed specifically for comparing \emph{all} $\binom{k}{2}$ pairs while holding the overall FWER at $\alpha = 0.05$. Uses the studentized range distribution and the pooled $MS_W$.
+    \item \textbf{Bonferroni / Holm-Bonferroni:} Adjusts individual $p$-values (Bonferroni divides $\alpha$ by the number of tests $m$; Holm steps down sequentially and is strictly more powerful than plain Bonferroni while keeping the same FWER guarantee).
+\end{itemize}
+
+\subsection{Two-Way ANOVA \& Interaction Effects}
+When you have two categorical factors (say, Algorithm $\times$ Hardware Architecture), Two-Way ANOVA tests three things simultaneously: Main Effect A, Main Effect B, and the \textbf{Interaction} $A \times B$.
+An interaction means ``the effect of Factor A \emph{depends on} the level of Factor B'' (e.g., Algorithm 1 wins on GPU, Algorithm 2 wins on CPU). \textcolor{crimson}{\textbf{Critical rule:}} If the interaction is significant, never blindly interpret main effects alone---averaging across CPU and GPU can cancel out opposite effects and falsely suggest ``neither algorithm matters!''
+
+\subsection{ANCOVA: Controlling for a Continuous Confounder}
+Look at \texttt{ANCOVA.csv} and \texttt{ANCOVA\_Analysis\_CZ.ipynb} in the repository! Suppose you compare 3 teaching methods on final exam scores ($Y$), and students entered the class with different pretest scores ($X$, a continuous \textbf{covariate}).
+\begin{itemize}
+    \item \textbf{Why plain ANOVA fails here:} Two bad things happen. First, pretest variation dumps huge unexplained spread into $SS_{\text{Within}}$ (the denominator of $F$), drowning out the true teaching-method signal! Second, if Group A accidentally got smarter students at the start, plain ANOVA wrongly credits Method A for pre-existing talent.
+    \item \textbf{How ANCOVA fixes it:} Fits a model $Y_{gi} = \mu + \alpha_g + \beta (X_{gi} - \bar{X}) + \varepsilon_{gi}$---essentially parallel regression lines, one per group! It subtracts out the predictable effect of $X$ from $Y$, dramatically shrinking $SS_{\text{Within}}$ (higher power!) and comparing group means \emph{adjusted to the same covariate value $\bar{X}$}.
+    \item \textbf{Crucial ANCOVA assumption:} \textbf{Homogeneity of regression slopes} (the lines must be roughly parallel; no strong Group $\times$ Covariate interaction). Always test the interaction term first!
+\end{itemize}
+
+\subsection{Assumptions, Non-Parametric Alternatives \& MANOVA}
+ANOVA assumes (1) independent observations, (2) approximately normal residuals within groups, and (3) equal variances across groups (\textbf{homoscedasticity}, checked by \textbf{Levene's test}---avoid Bartlett's test if data isn't strictly normal).
+\begin{itemize}
+    \item Unequal variances, still roughly normal $\Longrightarrow$ \textbf{Welch's ANOVA} (with Games-Howell post-hoc).
+    \item Skewed/heavy-tailed or ordinal data $\Longrightarrow$ \textbf{Kruskal-Wallis test} (replaces raw values with ranks $1 \dots N$, then runs an ANOVA-like check on mean ranks; post-hoc via Dunn's test).
+    \item Multiple dependent variables measured simultaneously ($\mathbf{Y} \in \mathbb{R}^p$ across $k$ groups) $\Longrightarrow$ \textbf{MANOVA}. Replaces scalar $SS_B$ and $SS_W$ with matrices $\mathbf{B}$ (between-group) and $\mathbf{W}$ (within-group), and summarizes $\mathbf{W}^{-1}\mathbf{B}$ via \textbf{Wilks' $\Lambda = \frac{|\mathbf{W}|}{|\mathbf{B}+\mathbf{W}|}$} (small $\Lambda \Rightarrow$ strong group separation) or \textbf{Pillai's Trace} (most robust to assumption violations).
+\end{itemize}
+
+% ============================================================================
+\section{P08: Contingency Tables \& Categorical Association}
+% ============================================================================
+\emph{Repository folder: \texttt{P08 kontingencni tabulky} (\texttt{P08\_kontingencni\_tabulky\_long.pdf}, \texttt{P08\_kontingencni\_tabulky.ipynb}).}
+
+\subsection{Independence as a Rank-1 Matrix}
+When both variables are categorical (e.g., Operating System $\times$ Browser, or Treatment $\times$ Recovery), you organize counts into an $r \times c$ \textbf{contingency table} of observed counts $O_{ij}$, with row sums $R_i$, column sums $C_j$, and grand total $N$.
+
+If the row variable and column variable were completely independent, then $P(\text{Row } i \text{ and Col } j) = P(\text{Row } i) \cdot P(\text{Col } j) \approx \frac{R_i}{N} \cdot \frac{C_j}{N}$. Multiplying by $N$ gives the \textbf{expected count under independence}:
+\[
+    E_{ij} = \frac{R_i \cdot C_j}{N}.
+\]
+Notice that $\mathbf{E} = \frac{1}{N} \mathbf{R}\mathbf{C}^\top$ is a rank-1 matrix! Any genuine association between the two categorical variables shows up as departures $(O_{ij} - E_{ij})$ from this rank-1 baseline.
+
+\subsection{Pearson's $\chi^2$ Test \& Degrees of Freedom}
+How do we turn all $r \times c$ discrepancies into one test statistic?
+\[
+    \chi^2 = \sum_{i=1}^r \sum_{j=1}^c \frac{(O_{ij} - E_{ij})^2}{E_{ij}}.
+\]
+\textbf{Why divide by $E_{ij}$?} Being off by $10$ counts when you expected $1{,}000$ is tiny noise; being off by $10$ when you expected $5$ is massive! For count (Poisson) data, the variance equals the mean ($E_{ij}$), so dividing $(O_{ij} - E_{ij})^2$ by $E_{ij}$ standardizes every cell onto the same variance-1 scale (like a squared $z$-score).
+
+\textbf{Why is $\text{df} = (r-1)(c-1)$?} Imagine filling an $r \times c$ Sudoku grid whose row totals $R_i$ and column totals $C_j$ are locked in advance. You can freely choose numbers in the top-left $(r-1) \times (c-1)$ sub-grid; once those are chosen, the last cell of every row and every column is completely forced by subtraction!
+
+\emph{Note on Test of Independence vs.\ Test of Homogeneity:} Algebraically they use the \emph{exact same} $\chi^2$ formula! The difference is how the data was collected: Independence draws one random sample of size $N$ and classifies on two traits; Homogeneity fixes sample sizes in each row (e.g., 100 men, 100 women) and asks whether their column distributions match.
+
+\subsection{When Pearson's $\chi^2$ Breaks $\longrightarrow$ Fisher's Exact Test}
+\textcolor{crimson}{\textbf{Why $\chi^2$ fails on sparse tables:}} The $\chi^2$ distribution is a \emph{continuous} approximation to discrete counts (via the CLT). When expected counts are tiny---classic Cochran's rule: any $E_{ij} < 1$, or more than $20\%$ of cells have $E_{ij} < 5$---the discrete staircase no longer looks like a smooth $\chi^2$ curve, and $p$-values become wildly inaccurate!
+
+\textbf{Solution: Fisher's Exact Test.} Instead of approximating, fix the row and column margins and compute the \emph{exact} combinatorial probability (Hypergeometric distribution) of observing a table as extreme as or more extreme than yours. Zero asymptotic assumptions; exact even for $N = 12$!
+
+\subsection{Statistical Significance $\neq$ Practical Strength (Effect Size)}
+\textcolor{crimson}{\textbf{A huge trap in real data science:}} Notice that if you duplicate your entire dataset $10\times$ (multiplying every $O_{ij}$ and $E_{ij}$ by $10$), the proportions do not change at all, yet $\chi^2$ multiplies by $10$! With $N = 100{,}000$ web clicks, a meaningless $0.3\%$ difference yields $p < 10^{-10}$. Never report $\chi^2$ alone---always pair it with an \textbf{effect size} invariant to $N$:
+\begin{itemize}
+    \item \textbf{Cramér's $V$:} $V = \sqrt{\frac{\chi^2}{N \cdot \min(r-1,\, c-1)}} \in [0, 1]$. For $2 \times 2$ tables, this equals the Phi coefficient $|\phi|$. Tells you how \emph{strong} the association is ($0 =$ none, $1 =$ perfect).
+    \item \textbf{Odds Ratio (OR) vs.\ Relative Risk (RR) for $2 \times 2$ tables:} Suppose disease rate is $2\%$ in exposed vs.\ $1\%$ in unexposed. $\text{RR} = 0.02 / 0.01 = 2.0$ (twice the probability). $\text{OR} = \frac{0.02/0.98}{0.01/0.99} \approx 2.02$. When events are rare, $\text{OR} \approx \text{RR}$; when events are common (say $60\%$ vs.\ $30\%$), $\text{RR} = 2.0$ while $\text{OR} = 3.5$---so never lazily read an Odds Ratio as ``3.5 times as likely!''
+    \item \textbf{Post-hoc cell diagnosis (Standardized Residuals):} Just like ANOVA, $\chi^2$ only says ``something is non-independent.'' Compute adjusted Pearson residuals $r_{ij} = \frac{O_{ij} - E_{ij}}{\sqrt{E_{ij}(1 - R_i/N)(1 - C_j/N)}}$; cells with $|r_{ij}| > 2$ (or Bonferroni-adjusted threshold) pinpoint \emph{which exact cells} drove the association.
+\end{itemize}
+
+\subsection{Simpson's Paradox: Why Collapsing Tables Can Invert Truth}
+When you collapse a 3D contingency table (e.g., Treatment $\times$ Recovery $\times$ Disease Severity) into a 2D table by summing over Severity, a treatment that has a \emph{higher} cure rate for mild cases AND a \emph{higher} cure rate for severe cases can bizarrely look \emph{worse} overall! How? If doctors overwhelmingly assign the better treatment to severe patients (who naturally recover less often), the unweighted overall average gets dragged down by severity. Always check for lurking confounding variables before trusting a 2D contingency table.
+
+% ============================================================================
+\section{P09: Correlation, Partial Correlation \& Copulas}
+% ============================================================================
+\emph{Repository folder: \texttt{P09 korelace} (\texttt{P09\_korelace\_long.pdf}, \texttt{P09b\_kopule.pdf}, \texttt{P09b\_kopule.ipynb}, \texttt{EuStockMarkets.csv}).}
+
+\subsection{Pearson $r$ as Cosine Similarity (and Where It Breaks)}
+Look closely at the sample Pearson correlation formula between two vectors $\mathbf{x}, \mathbf{y} \in \mathbb{R}^n$:
+\[
+    r = \frac{\sum_{i=1}^n (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_{i=1}^n (x_i - \bar{x})^2}\sqrt{\sum_{i=1}^n (y_i - \bar{y})^2}}
+    = \frac{\mathbf{x}_c^\top \mathbf{y}_c}{\|\mathbf{x}_c\|_2 \|\mathbf{y}_c\|_2} = \cos(\theta).
+\]
+\textbf{CS light-bulb moment:} Pearson's $r$ is literally the \textbf{cosine similarity} between the mean-centered data vectors! $r = 1$ means the vectors point in the exact same direction ($\theta = 0^\circ$); $r = 0$ means they are orthogonal ($\theta = 90^\circ$).
+
+\textcolor{crimson}{\textbf{Why Pearson $r$ Fails:}}
+\begin{enumerate}
+    \item \textbf{Non-linear relationships:} $r$ strictly measures how tightly points hug a \emph{straight line}. A clean exponential curve $y = e^{5x}$ has $r \ll 1$, and a clean parabola $y = x^2$ on $[-3, 3]$ has $r = 0$!
+    \item \textbf{Extreme outlier sensitivity:} One single distant outlier acts like a giant lever, turning $r = 0$ noise into $r = 0.95$ (see \emph{Anscombe's Quartet}---four totally different scatter plots sharing identical $\bar{x}, \bar{y}, s_x, s_y$, and $r = 0.816$!).
+\end{enumerate}
+
+\subsection{Rank Correlations: Spearman's $\rho$ and Kendall's $\tau$}
+To defeat both monotonic curves and outliers, throw away the raw magnitudes and replace each column with its sorted **ranks** $1, 2, \dots, n$:
+\begin{itemize}
+    \item \textbf{Spearman's $\rho$:} Simply compute Pearson's $r$ on the \emph{ranks} of $X$ and $Y$! Any strictly increasing curve ($y = e^x$, $y = x^3$, $y = \log x$) becomes an exact straight line in rank space, yielding $\rho = +1.0$! And moving an outlier from $100$ to $10^9$ doesn't change its rank at all.
+    \item \textbf{Kendall's $\tau$:} Inspect every pair of points $(i, j)$. Call the pair \emph{concordant} if both variables move in the same direction ($(x_i - x_j)(y_i - y_j) > 0$), else \emph{discordant}. Then $\tau = \frac{N_{\text{concordant}} - N_{\text{discordant}}}{\binom{n}{2}}$. Kendall's $\tau$ has a cleaner probabilistic interpretation ($P(\text{concordant}) - P(\text{discordant})$), better small-sample properties, and maps directly to Copula parameters!
+\end{itemize}
+\emph{Note:} Even rank correlations fail on \textbf{non-monotonic} patterns like $y = x^2$ or circles! For arbitrary non-linear dependence, use Distance Correlation or Mutual Information.
+
+\subsection{Partial Correlation: Removing a Confounding Variable}
+Ice cream sales ($X$) and drowning deaths ($Y$) are strongly correlated ($r \approx 0.85$). Neither causes the other---summer temperature ($Z$) drives both! \textbf{Partial correlation} $r_{XY \cdot Z}$ measures the linear association between $X$ and $Y$ \emph{after removing the linear influence of $Z$}:
+\begin{enumerate}
+    \item Regress $X$ on $Z$ and keep the leftover residuals $\mathbf{e}_{X|Z}$ (the part of $X$ not explained by $Z$).
+    \item Regress $Y$ on $Z$ and keep the leftover residuals $\mathbf{e}_{Y|Z}$.
+    \item Compute ordinary Pearson correlation between $\mathbf{e}_{X|Z}$ and $\mathbf{e}_{Y|Z}$!
+\end{enumerate}
+For a single confounder $Z$, this simplifies to the neat closed form:
+\[
+    r_{XY \cdot Z} = \frac{r_{XY} - r_{XZ} r_{YZ}}{\sqrt{(1 - r_{XZ}^2)(1 - r_{YZ}^2)}}.
+\]
+For many confounders, partial correlations can be read off directly from the **inverse covariance (precision) matrix** $\boldsymbol{\Omega} = \boldsymbol{\Sigma}^{-1}$: $\rho_{ij \cdot \text{rest}} = -\frac{\omega_{ij}}{\sqrt{\omega_{ii}\omega_{jj}}}$. Zero entries in $\boldsymbol{\Sigma}^{-1}$ mean conditional independence!
+
+\subsection{Copulas \& Sklar's Theorem: Why Linear Correlation Fails in Crashes}
+Look at \texttt{P09b\_kopule.ipynb} and \texttt{EuStockMarkets.csv} (European stock indices: DAX, SMI, CAC, FTSE). Why does this course spend a dedicated lecture on \textbf{Copulas}?
+
+\textcolor{crimson}{\textbf{Why Multivariate Normal / Pearson Correlation Fails in Finance \& Reliability:}}
+Real stock returns (and server outage durations) have \textbf{heavy tails} (not Gaussian) AND \textbf{asymmetric tail dependence}: on calm sunny days, two markets drift semi-independently; on a panic crash day, \emph{everything plunges together simultaneously}! A Multivariate Normal model cannot even mix different marginal types (say, one Exponential variable and one Student-$t$ variable), AND its Gaussian dependence has **zero tail dependence**---meaning as events get more extreme, a Gaussian model insists joint crashes become nearly independent! (Misusing Gaussian copulas to price mortgage risk was famously implicated in the 2008 financial crisis.)
+
+\textbf{How Copulas Solve This (Sklar's Theorem):}
+Remember the Probability Integral Transform from P03? For \emph{any} continuous random variable $X_j$ with CDF $F_j$, transforming $U_j = F_j(X_j)$ maps $X_j$ onto a uniform $U(0,1)$ variable---stripping away its marginal shape (skew, heavy tails, units) while preserving its exact rank ordering!
+
+\textbf{Sklar's Theorem} states that \emph{every} multivariate joint CDF $F(x_1, \dots, x_p)$ can be cleanly decomposed into two modular pieces (a CS engineer's dream of separation of concerns!):
+\[
+    F(x_1, \dots, x_p) = C\big(F_1(x_1), F_2(x_2), \dots, F_p(x_p)\big),
+\]
+where $F_1, \dots, F_p$ are the 1D marginal distributions (pick whatever fits each column best: Gamma, $t$, LogNormal, empirical!) and $C: [0,1]^p \to [0,1]$ is the \textbf{Copula}---a joint distribution on the unit hypercube $[0,1]^p$ with $U(0,1)$ marginals that captures \textbf{100\% of the pure dependence structure}!
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Copula Family} & \textbf{Tail Dependence} & \textbf{Geometric Shape \& Best Use Case} \\
+\midrule
+Gaussian & Lower $= 0$, Upper $= 0$ & Symmetric oval on $[0,1]^2$. Good for mild central correlation; \textbf{dangerous for joint extremes/crashes!} \\
+Student-$t$ & Lower $=$ Upper $> 0$ & Symmetric with pinched corners at both $(0,0)$ and $(1,1)$. Models simultaneous booms AND crashes (e.g., \texttt{EuStockMarkets}). \\
+Clayton & Lower $> 0$, Upper $= 0$ & Sharp teardrop spike at $(0,0)$, diffuse at $(1,1)$. Classic for \textbf{financial crashes} or joint hardware failures! \\
+Gumbel & Lower $= 0$, Upper $> 0$ & Sharp spike at $(1,1)$, diffuse at $(0,0)$. Models simultaneous upper extremes (floods, peak network load spikes). \\
+Frank & Lower $= 0$, Upper $= 0$ & Symmetric, lighter in tails than Gaussian; handles both positive and negative dependence cleanly. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================================================================
+\section{P10: Multiple Linear Regression}
+% ============================================================================
+\emph{Repository folder: \texttt{P10 regrese} (\texttt{README.md}).}
+
+\subsection{OLS as Orthogonal Projection (Linear Algebra Magic)}
+We want to predict a continuous target $\mathbf{y} \in \mathbb{R}^n$ from $p$ features packed into design matrix $\mathbf{X} \in \mathbb{R}^{n \times (p+1)}$ (with a leading column of $1$s for the intercept):
+\[
+    \mathbf{y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}, \qquad \mathbb{E}[\boldsymbol{\varepsilon}] = \mathbf{0},\quad \operatorname{Cov}(\boldsymbol{\varepsilon}) = \sigma^2 \mathbf{I}_n.
+\]
+Ordinary Least Squares (OLS) chooses $\hat{\boldsymbol{\beta}}$ to minimize the squared Euclidean length of the residual vector $\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2$.
+
+\textbf{Forget calculus for a second---look at the geometry!} As $\boldsymbol{\beta}$ varies, $\mathbf{X}\boldsymbol{\beta}$ sweeps out a flat hyperplane called the \textbf{column space} $\operatorname{col}(\mathbf{X}) \subset \mathbb{R}^n$. The closest point $\hat{\mathbf{y}} = \mathbf{X}\hat{\boldsymbol{\beta}}$ on that hyperplane to $\mathbf{y}$ is found by dropping a perpendicular straight down! Therefore, the residual vector $\mathbf{e} = \mathbf{y} - \mathbf{X}\hat{\boldsymbol{\beta}}$ MUST be orthogonal to every column of $\mathbf{X}$:
+\[
+    \mathbf{X}^\top (\mathbf{y} - \mathbf{X}\hat{\boldsymbol{\beta}}) = \mathbf{0}
+    \quad \Longrightarrow \quad
+    \underbrace{\mathbf{X}^\top \mathbf{X} \hat{\boldsymbol{\beta}} = \mathbf{X}^\top \mathbf{y}}_{\text{Normal Equations}}
+    \quad \Longrightarrow \quad
+    \hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{y}.
+\]
+The hat matrix $\mathbf{H} = \mathbf{X}(\mathbf{X}^\top \mathbf{X})^{-1}\mathbf{X}^\top$ is literally the orthogonal projection matrix ($\mathbf{H}^2 = \mathbf{H}$, $\mathbf{H}^\top = \mathbf{H}$). And under the Gauss-Markov assumptions (linearity, zero-mean uncorrelated constant-variance errors), OLS is \textbf{BLUE}: Best (lowest variance) Linear Unbiased Estimator.
+
+\textbf{Interpreting $\hat{\beta}_j$:} In multiple regression, $\hat{\beta}_j$ is NOT the same as regressing $y$ on $x_j$ alone! It is the expected change in $y$ for a 1-unit increase in $x_j$ \emph{holding all other features in $\mathbf{X}$ constant} (equivalently, the slope after projecting out the other features).
+
+\textbf{$R^2$ vs.\ Adjusted $R^2$:} $R^2 = 1 - \frac{SSE}{SST}$ measures the fraction of target variance explained. \textcolor{crimson}{\textbf{Why plain $R^2$ lies:}} Adding \emph{pure random garbage columns} to $\mathbf{X}$ enlarges $\operatorname{col}(\mathbf{X})$, so the projection can only get closer to $\mathbf{y}$---meaning $R^2$ \emph{never} decreases! \textbf{Adjusted $R^2$} $= 1 - \frac{SSE/(n-p-1)}{SST/(n-1)}$ penalizes each added feature so junk features make Adjusted $R^2$ go \emph{down}.
+
+\subsection{Why OLS Breaks \& How to Fix It}
+\begin{enumerate}
+    \item \textbf{Multicollinearity (The $(\mathbf{X}^\top\mathbf{X})^{-1}$ Explosion):} Suppose feature $x_2 \approx 2 x_1$ (e.g., floor area in $\text{m}^2$ and in $\text{ft}^2$, or highly correlated sensors). Then $\mathbf{X}^\top\mathbf{X}$ has a tiny eigenvalue $\lambda_{\min} \approx 0$ (huge condition number). Since $\operatorname{Cov}(\hat{\boldsymbol{\beta}}) = \sigma^2 (\mathbf{X}^\top\mathbf{X})^{-1}$, inverting $\lambda_{\min}$ blows up the variance of $\hat{\boldsymbol{\beta}}$ to infinity! Weights swing wildly (e.g., $+10{,}000$ on $x_1$ and $-5{,}000$ on $x_2$), individual $t$-tests look insignificant even when $R^2 = 0.99$, and signs can flip!
+    \begin{itemize}
+        \item \emph{Diagnostic:} \textbf{Variance Inflation Factor} $\text{VIF}_j = \frac{1}{1 - R_j^2}$, where $R_j^2$ comes from predicting feature $j$ from all other features. $\text{VIF} > 5$ or $10$ signals severe multicollinearity.
+        \item \emph{Fix --- Ridge Regression ($L_2$):} Minimize $\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2 + \lambda \|\boldsymbol{\beta}\|_2^2 \implies \hat{\boldsymbol{\beta}}_{\text{ridge}} = (\mathbf{X}^\top\mathbf{X} + \lambda \mathbf{I})^{-1}\mathbf{X}^\top\mathbf{y}$. Adding $\lambda$ to the diagonal lifts every eigenvalue away from zero! You trade a tiny amount of bias for a massive drop in variance.
+        \item \emph{Fix --- Lasso ($L_1$):} Adds $\lambda \|\boldsymbol{\beta}\|_1$, whose diamond-shaped constraint geometry drives irrelevant feature weights to \emph{exact zero} (automatic feature selection!).
+    \end{itemize}
+    \item \textbf{Heteroscedasticity (Non-constant error variance):} OLS $\hat{\boldsymbol{\beta}}$ stays unbiased, \emph{but} its standard errors, confidence intervals, and $p$-values become wrong! Fix: Weighted Least Squares (WLS), log-transform $y$, or Huber-White robust standard errors.
+    \item \textbf{Influential Points \& High Leverage:} A point far from the center in $\mathbf{X}$-space has high \emph{leverage} ($h_{ii}$, diagonal of $\mathbf{H}$) and can single-handedly yank the entire regression plane toward itself! Diagnose with \textbf{Cook's Distance} (how much all predictions change when point $i$ is deleted).
+    \item \textbf{Binary Target $Y \in \{0,1\}$:} \textcolor{crimson}{\textbf{Why linear regression fails for classification:}} It predicts impossible probabilities like $-0.4$ or $+1.7$, and errors cannot have constant variance. Fix: \textbf{Logistic Regression} models the log-odds $\ln\frac{p}{1-p} = \mathbf{x}^\top\boldsymbol{\beta}$, squashing predictions smoothly into $(0,1)$ via the sigmoid function $\sigma(z) = \frac{1}{1+e^{-z}}$.
+\end{enumerate}
+
+% ============================================================================
+\section{P11: Dimensionality Reduction --- PCA \& Beyond}
+% ============================================================================
+\emph{Repository folder: \texttt{P11 redukce dimense} (\texttt{README.md}).}
+
+\subsection{The Core Problem \& Two Views That Magically Agree}
+You have $p = 100$ correlated features. Most of them carry overlapping information, slow down algorithms, cause multicollinearity, and trigger the Curse of Dimensionality. \textbf{Principal Component Analysis (PCA)} finds $k \ll p$ orthogonal new axes (linear combinations of the original features) that preserve as much structure as possible.
+
+Two seemingly different engineering goals lead to the \textbf{exact same solution}:
+\begin{enumerate}
+    \item \textbf{Maximum Variance View (Information preservation):} Find unit direction $\mathbf{w}_1$ ($\|\mathbf{w}_1\|_2 = 1$) such that the projected points $z_i = \mathbf{w}_1^\top \mathbf{x}_i$ are as spread out as possible: maximize $\operatorname{Var}(\mathbf{w}_1^\top \mathbf{X}) = \mathbf{w}_1^\top \mathbf{S} \mathbf{w}_1$.
+    \item \textbf{Minimum Reconstruction Error View (Lossy compression):} Find a $k$-dimensional hyperplane such that projecting points onto it and mapping back produces the smallest total squared error $\sum_{i=1}^n \|\mathbf{x}_i - \hat{\mathbf{x}}_i\|_2^2$.
+\end{enumerate}
+Why are they identical? By the Pythagorean theorem, for every point $\|\mathbf{x}_i\|^2 = \|\text{projection}\|^2 + \|\text{error}\|^2$. Since total squared length is fixed, maximizing projected variance \emph{simultaneously} minimizes reconstruction error!
+
+\subsection{The Math Decoded: Eigenvectors of $\mathbf{S}$ and SVD}
+Solving $\max_{\|\mathbf{w}\|=1} \mathbf{w}^\top \mathbf{S} \mathbf{w}$ via Lagrange multipliers yields the eigenvalue equation:
+\[
+    \mathbf{S} \mathbf{w}_j = \lambda_j \mathbf{w}_j, \qquad \lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_p \ge 0.
+\]
+\begin{itemize}
+    \item The \textbf{eigenvectors} $\mathbf{w}_1, \dots, \mathbf{w}_p$ (loadings) are the principal axes of the data ellipsoid---guaranteed orthogonal because $\mathbf{S}$ is symmetric!
+    \item The \textbf{eigenvalues} $\lambda_j$ are the exact variances along each new axis!
+    \item The \textbf{explained variance ratio} of component $j$ is $\frac{\lambda_j}{\sum_{m=1}^p \lambda_m}$. Choose $k$ using a \textbf{scree plot} (look for the ``elbow'') or cumulative threshold (e.g., $85\%$--$95\%$ variance retained).
+\end{itemize}
+
+\textbf{CS Implementation Tip (Why libraries use SVD, not $\mathbf{X}_c^\top\mathbf{X}_c$):} Computing the Singular Value Decomposition $\mathbf{X}_c = \mathbf{U}\mathbf{D}\mathbf{V}^\top$ directly gives the principal directions as columns of $\mathbf{V}$, scores as $\mathbf{U}\mathbf{D}$, and eigenvalues as $\lambda_j = d_j^2 / (n-1)$. Never explicitly form $\mathbf{X}_c^\top \mathbf{X}_c$ when $p$ is huge: squaring the matrix squares its condition number and loses floating-point precision!
+
+\subsection{Why PCA Fails (Four Common Traps)}
+\begin{enumerate}
+    \item \textbf{Forgetting to standardize features:} Suppose $X_1$ is salary in CZK (variance $\approx 10^9$) and $X_2$ is years of experience (variance $\approx 25$). Raw covariance PCA will assign $99.9999\%$ of PC1 to salary purely because of units! Always standardize (equivalent to running PCA on the \textbf{correlation matrix} $\mathbf{R}$) unless all features share identical physical units and scales genuinely reflect importance.
+    \item \textbf{Non-linear manifolds:} PCA can only slice the world with flat hyperplanes. On a 3D ``Swiss roll'' or concentric circles, any flat linear projection squashes distinct layers right on top of each other. \emph{Alternatives:} \textbf{Kernel PCA} (maps to high-D feature space via kernel trick), \textbf{t-SNE} and \textbf{UMAP} (preserve local neighborhood graphs for 2D/3D visualization---though beware: t-SNE/UMAP distort global distances and cluster sizes!).
+    \item \textbf{Extreme outliers:} Because PCA maximizes \emph{squared} variance, a single distant outlier grabs PC1 and rotates the entire coordinate system toward itself. \emph{Alternative:} Robust PCA (or clean outliers via P05 first!).
+    \item \textbf{PCA is UNSUPERVISED (ignores class labels $Y$!):} Imagine two parallel pancake-shaped classes separated by a narrow gap along the vertical axis, while stretched hugely along the horizontal axis. PCA picks the horizontal axis (biggest overall variance) and projects both classes straight onto each other, \textbf{completely destroying class separability}! That exact failure motivates Lecture P12!
+\end{enumerate}
+
+\textbf{PCA vs.\ Factor Analysis (FA):} Students often confuse them. PCA is purely descriptive compression: $Z = \mathbf{W}^\top \mathbf{X}$ (components are weighted sums of observed features). Factor Analysis is a \emph{generative latent-variable model}: $\mathbf{X} = \boldsymbol{\Lambda}\mathbf{F} + \boldsymbol{\varepsilon}$ (hidden unobservable causes $\mathbf{F}$, like ``math aptitude'' and ``verbal aptitude,'' generate the observed test scores plus unique noise $\boldsymbol{\varepsilon}$). PCA explains \emph{total} variance; FA explains only the \emph{shared covariance} among variables.
+
+% ============================================================================
+\section{P12: Discriminant Analysis --- LDA \& QDA}
+% ============================================================================
+\emph{Repository folder: \texttt{P12 diskriminacni analyza} (\texttt{README.md}).}
+
+\subsection{The Core Problem: Supervised Separation}
+Unlike PCA, we now have labeled training data $(\mathbf{x}_i, y_i)$ belonging to $K$ known classes (e.g., spam vs.\ ham, healthy vs.\ tumor, 3 Iris species). We want two tightly connected things: (1) find the best low-dimensional projection that \emph{separates the classes}, and (2) build a classifier that assigns any new point $\mathbf{x}$ to the right class.
+
+\subsection{Two Perspectives on Linear Discriminant Analysis (LDA)}
+
+\textbf{Perspective 1: Fisher's Geometric Criterion (No Gaussian assumption needed!).}
+Suppose you have two classes with means $\boldsymbol{\mu}_1, \boldsymbol{\mu}_2$ and covariance matrices. Project onto a direction $\mathbf{w}$. You want the projected class means $(\mathbf{w}^\top\boldsymbol{\mu}_1 - \mathbf{w}^\top\boldsymbol{\mu}_2)^2$ to be \textbf{far apart}, while the within-class scatter around each mean stays \textbf{tight and narrow}!
+Define the between-class scatter matrix $\mathbf{S}_B$ and within-class scatter matrix $\mathbf{S}_W$. Fisher maximizes the signal-to-noise ratio (Rayleigh quotient):
+\[
+    J(\mathbf{w}) = \frac{\mathbf{w}^\top \mathbf{S}_B \mathbf{w}}{\mathbf{w}^\top \mathbf{S}_W \mathbf{w}}
+    \quad \Longrightarrow \quad
+    \mathbf{S}_W^{-1} \mathbf{S}_B \mathbf{w} = \lambda \mathbf{w}.
+\]
+Look at the magic for $K=2$ classes: $\mathbf{w}^* \propto \mathbf{S}_W^{-1}(\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2)$. Why isn't the best projection simply the line connecting the two centroids $(\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2)$? Because if the two class ellipsoids are tilted diagonally, projecting straight along $(\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2)$ makes their tails overlap! Multiplying by $\mathbf{S}_W^{-1}$ \textbf{whitens} the within-class ellipsoids into spheres first, where the centroid difference \emph{is} optimal! Also notice: for $K$ classes, $\operatorname{rank}(\mathbf{S}_B) \le K - 1$, so LDA can produce at most $\min(p,\, K-1)$ discriminant axes!
+
+\textbf{Perspective 2: The Bayesian Generative View (Where LDA vs.\ QDA emerges!).}
+Model each class $k$ as a Multivariate Normal $N_p(\boldsymbol{\mu}_k, \boldsymbol{\Sigma}_k)$ with prior probability $\pi_k = P(Y = k)$. By Bayes' Theorem, assign $\mathbf{x}$ to the class maximizing $\pi_k f_k(\mathbf{x})$, or equivalently maximizing the log-posterior:
+\[
+    \delta_k(\mathbf{x}) = \ln \pi_k - \frac{1}{2}\ln|\boldsymbol{\Sigma}_k| - \frac{1}{2}(\mathbf{x} - \boldsymbol{\mu}_k)^\top \boldsymbol{\Sigma}_k^{-1}(\mathbf{x} - \boldsymbol{\mu}_k).
+\]
+Now watch what happens when you expand that quadratic form:
+\begin{itemize}
+    \item \textbf{Assume shared covariance ($\boldsymbol{\Sigma}_1 = \dots = \boldsymbol{\Sigma}_K = \boldsymbol{\Sigma}$) $\Longrightarrow$ LDA:}
+    The quadratic term $-\frac{1}{2}\mathbf{x}^\top \boldsymbol{\Sigma}^{-1}\mathbf{x}$ and $-\frac{1}{2}\ln|\boldsymbol{\Sigma}|$ are identical for every class $k$, so they \textbf{cancel out}! What survives is purely \textbf{linear} in $\mathbf{x}$:
+    \[
+        \delta_k^{\text{LDA}}(\mathbf{x}) = \mathbf{x}^\top \boldsymbol{\Sigma}^{-1}\boldsymbol{\mu}_k - \frac{1}{2}\boldsymbol{\mu}_k^\top \boldsymbol{\Sigma}^{-1}\boldsymbol{\mu}_k + \ln \pi_k.
+    \]
+    Therefore, the decision boundary $\delta_j(\mathbf{x}) = \delta_k(\mathbf{x})$ is a flat **hyperplane**! Geometrically (when priors are equal), LDA assigns $\mathbf{x}$ to whichever class centroid is closest in **Mahalanobis distance**!
+    \item \textbf{Allow class-specific covariances ($\boldsymbol{\Sigma}_k$ differs per class) $\Longrightarrow$ QDA:}
+    The quadratic term $-\frac{1}{2}\mathbf{x}^\top \boldsymbol{\Sigma}_k^{-1}\mathbf{x}$ no longer cancels! The decision boundary becomes a **quadratic surface** (parabola, ellipse, hyperbola), allowing QDA to separate classes with completely different shapes or orientations (e.g., one tight circular cluster inside a wide tilted ring).
+\end{itemize}
+
+\subsection{LDA vs.\ QDA vs.\ Logistic Regression (Bias-Variance Tradeoff)}
+\textcolor{crimson}{\textbf{Why QDA isn't always better than LDA:}} QDA must estimate a separate $p \times p$ symmetric covariance matrix for \emph{every} class---that is $K \cdot \frac{p(p+1)}{2}$ covariance parameters! For $p = 50$ features and $K = 4$ classes, QDA estimates $5{,}100$ covariance entries. Unless $n_k \gg p$ in \emph{every} class, QDA severely overfits (and crashes if any $\mathbf{S}_k$ is singular). LDA pools all classes into one $\boldsymbol{\Sigma}$, drastically cutting variance (at the cost of linear-boundary bias). \textbf{Regularized Discriminant Analysis (RDA)} blends $\mathbf{S}_k$ toward $\mathbf{S}_{\text{pool}}$ and $\mathbf{I}$ to get the best of both worlds.
+
+\textbf{LDA vs.\ Logistic Regression:} Both produce linear decision boundaries!
+\begin{itemize}
+    \item \textbf{LDA (Generative):} Models $P(\mathbf{X} \mid Y=k)$ as Gaussian. If classes genuinely are roughly Gaussian with equal covariance, LDA is more statistically efficient (needs fewer samples) and stays stable even when classes are perfectly linearly separable (where unregularized Logistic Regression weights diverge to $\pm\infty$!).
+    \item \textbf{Logistic Regression (Discriminative):} Directly models $P(Y=k \mid \mathbf{X})$ without assuming $\mathbf{X}$ is Gaussian. Much more robust when features are binary, skewed, heavily non-normal, or contain outliers!
+\end{itemize}
+
+\subsection{Evaluating Classifiers Properly (Never Trust Raw Accuracy!)}
+\textcolor{crimson}{\textbf{Why accuracy lies on imbalanced data:}} If $99\%$ of transactions are legitimate and $1\%$ are fraud (similar to imbalanced anomaly data like \texttt{mammography.csv}), a dumb classifier that outputs ``legitimate'' for everything gets $99\%$ accuracy while catching $0\%$ of fraud!
+\begin{itemize}
+    \item Inspect the \textbf{Confusion Matrix}: Precision ($\frac{TP}{TP+FP}$), Recall / Sensitivity ($\frac{TP}{TP+FN}$), Specificity ($\frac{TN}{TN+FP}$), and $F_1$-score.
+    \item Use \textbf{ROC-AUC} (tradeoff of True Positive Rate vs.\ False Positive Rate across all thresholds) or **PR-AUC** (even more honest under severe class imbalance).
+    \item Always evaluate via \textbf{$k$-fold Cross-Validation} or a held-out test set---training-set accuracy always looks artificially rosy because $\hat{\boldsymbol{\mu}}_k$ and $\hat{\boldsymbol{\Sigma}}_k$ were fit to those exact points!
+\end{itemize}
+
+\newpage
+
+% ============================================================================
+\section{Master Decision Playbook \& Deep-Understanding Principles}
+% ============================================================================
+
+Use this final reference table to connect any real-world data problem to the right tool from `P01`--`P12`, check what could quietly break it, and know your escape hatch.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Goal / Data} & \textbf{Standard MSM Method} & \textbf{Key Assumptions} & \textbf{How It Breaks} & \textbf{Robust / Modern Alternative} \\
+\midrule
+Simulate correlated continuous data & Cholesky ($\boldsymbol{\mu} + \mathbf{L}\mathbf{Z}$) & MVN; $\boldsymbol{\Sigma}$ positive definite & Singular $\boldsymbol{\Sigma}$; non-normal marginals or tail crashes & Eigendecomp.\ (singular); Copulas (non-normal / tails) \\
+Detect multivariate outliers & Classical Mahalanobis $D_M^2 > \chi_{p, 1-\alpha}^2$ & Single MVN cloud; clean $\bar{\mathbf{x}}, \mathbf{S}$ & Masking/swamping; multi-cluster or curved data & MCD robust $D_M^2$; LOF; Isolation Forest \\
+Test mean vector (1 or 2 groups) & Hotelling's $T^2$ & MVN; $n > p$; equal $\boldsymbol{\Sigma}$ (2-sample) & Outliers; unequal $\boldsymbol{\Sigma}$; $p \ge n$ & Permutation test; Welch-type $T^2$; regularized tests \\
+Compare $k \ge 3$ group means & One-Way ANOVA + Tukey HSD & Independent; normal residuals; equal variances & Unequal variances; skewed/ordinal data; confounder & Welch ANOVA; Kruskal-Wallis; ANCOVA (confounder); MANOVA (multi-$Y$) \\
+Test 2 categorical variables & Pearson $\chi^2$ + Cramér's $V$ & Independent obs.; expected counts $E_{ij} \ge 5$ & Sparse/small cells; huge $N$ makes tiny effects ``sig.'' & Fisher's Exact Test; Odds Ratio; stratify for Simpson's paradox \\
+Measure association (2 continuous) & Pearson $r$ & Linear trend; no extreme outliers & Curves ($e^x$, $x^2$); outliers; confounders; tail crashes & Spearman $\rho$ / Kendall $\tau$; Partial corr.; Copulas ($t$/Clayton) \\
+Predict continuous $Y$ from $\mathbf{X}$ & Multiple OLS Regression & Linear; homoscedastic; no multicollinearity & Collinear $\mathbf{X}$ explodes $(\mathbf{X}^\top\mathbf{X})^{-1}$; high-leverage outliers & Ridge ($L_2$) / Lasso ($L_1$); WLS / robust SE; Huber regression \\
+Compress $p$ features & PCA (on standardized $\mathbf{X}$ via SVD) & Linear subspace; clean variance; unsupervised & Unscaled units; curves; outliers; destroys class labels & Kernel PCA; UMAP/t-SNE (viz); Factor Analysis; LDA (supervised) \\
+Classify into $K$ labeled classes & LDA & Gaussian classes; shared $\boldsymbol{\Sigma}$; $n \gg p$ & Different class shapes; non-Gaussian features; $p \approx n$ & QDA (diff.\ $\boldsymbol{\Sigma}_k$); RDA; Logistic Regression; Random Forest \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Ten Principles to Carry Beyond the Course}
+
+\begin{enumerate}
+    \item \textbf{Never inspect correlated variables solely one column at a time.} Marginals hide joint dependence, joint outliers, joint mean shifts, and Simpson's paradox.
+    \item \textbf{See $\boldsymbol{\Sigma}$ as an ellipsoid and $\boldsymbol{\Sigma}^{-1}$ as the whitening lens.} Once you picture Mahalanobis distance as Euclidean distance in whitened coordinates, P02, P03, P05, P06, and P12 collapse into a single geometric concept.
+    \item \textbf{Always ask: ``Are my units distorting distances or variances?''} Covariance, Euclidean distance, PCA, Ridge/Lasso, and $k$-NN all silently break when one feature is measured in millimeters and another in kilometers.
+    \item \textbf{Running $m$ separate tests without correction is a bug, not an analysis.} Whether comparing $p$ coordinates (P06) or $k$ groups (P07), multiple comparisons inflate false positives exponentially unless you use a multivariate omnibus test or adjust $\alpha$.
+    \item \textbf{Uncorrelated $\neq$ Independent, and Linear Correlation $\neq$ Tail Dependence.} Zero Pearson $r$ allows deterministic non-linear curves ($Y = X^2$), and Gaussian correlation completely misses simultaneous extreme crashes (motivating rank methods and Copulas in P09).
+    \item \textbf{A tiny $p$-value does NOT mean a big or useful effect.} With enough rows, trivial differences pass $p < 0.001$. Always report effect sizes (Cramér's $V$, $R^2$, $\eta^2$, Mahalanobis distance, confidence intervals).
+    \item \textbf{Check for singularity before inverting any matrix.} Whenever $n \le p$ or features are collinear, $\mathbf{S}$ and $\mathbf{X}^\top \mathbf{X}$ become singular or ill-conditioned---causing Cholesky, Hotelling's $T^2$, OLS, and LDA/QDA to fail or explode.
+    \item \textbf{Classical moments ($\bar{\mathbf{x}}, \mathbf{S}$) have a $0\%$ breakdown point.} A tiny handful of corrupted rows can sabotage means, standard deviations, correlations, OLS slopes, PCA axes, and classical Mahalanobis outlier detectors simultaneously.
+    \item \textbf{Know whether your goal is unsupervised compression or supervised prediction.} PCA maximizes total variance regardless of labels; LDA and Regression explicitly target $Y$. Never assume top PCs carry the best predictive signal.
+    \item \textbf{When parametric assumptions look shaky, think like a computer scientist.} Permutation tests, bootstrap confidence intervals, cross-validation, Isolation Forests, and rank/copula transforms trade closed-form formulas for compute---giving you trustworthy answers even when real-world data refuses to be Gaussian.
+\end{enumerate}
+
+\end{document}

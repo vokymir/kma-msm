@@ -1,0 +1,578 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{xcolor}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black
+}
+
+\titleformat{\section}{\Large\bfseries\color{blue!60!black}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries\color{blue!50!black}}{\thesubsection}{0.6em}{}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\mat}[1]{\mathbf{#1}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Cov}{\mathrm{Cov}}
+
+\title{\textbf{Multidimensional Statistical Methods (KMA/MSM)}\\[4pt]
+\large A Plain-Language Guide for Computer Scientists}
+\author{Compiled from the course materials of B.~Šedivá (ZČU)}
+\date{}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ======================================================================
+\section*{Preface: How to Use This Guide}
+\addcontentsline{toc}{section}{Preface}
+
+This document is not a replacement for the lectures or the official
+slides.  It is a \emph{translation} of the core ideas into the language
+of someone who thinks in algorithms, data structures, and code.
+The goal is to answer three questions for every method:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{What is it?} (a plain description, no formulas first)
+    \item \textbf{Why does it work?} (the geometric or probabilistic intuition)
+    \item \textbf{Why do simpler alternatives fail?} (the trap the method avoids)
+\end{enumerate}
+
+Mathematics is included only where it sharpens the intuition.
+You are not expected to reproduce proofs; you are expected to
+understand \emph{why} a tool is the right one for a given job.
+
+% ======================================================================
+\section{The Big Picture: Why Multivariate Statistics?}
+
+In univariate statistics you have \emph{one} number per observation
+(height, salary, temperature).  In multivariate statistics you have a
+\emph{vector} of numbers per observation:
+\[
+\vect{x}_i = (x_{i1}, x_{i2}, \dots, x_{ip}) \in \R^p .
+\]
+The dimensions are not independent.  A tall person tends to weigh more;
+a high-income neighbourhood tends to have larger houses.  If you
+analyse each variable separately, you throw away the information
+hidden in the \emph{correlations}.  Worse, you create two problems:
+
+\begin{itemize}
+    \item \textbf{Multiple testing.}  If you run $p$ separate tests at
+          significance level $0.05$, the chance of at least one false
+          positive grows rapidly with $p$.
+    \item \textbf{Geometry changes.}  In high dimensions, the Euclidean
+          distance between points behaves counter-intuitively (the
+          ``curse of dimensionality'').  A point can be far from the
+          centre in one coordinate but still be a perfectly normal
+          observation because the cloud is stretched in that direction.
+\end{itemize}
+
+Multivariate methods solve these problems by treating the whole vector
+as one object.  The covariance matrix is the key that encodes the
+shape of the cloud.
+
+% ======================================================================
+\section{Random Vectors and Multivariate Distributions}
+
+\subsection{Joint, marginal, and conditional distributions}
+A \textbf{random vector} $\vect{X}=(X_1,\dots,X_p)$ has a
+\emph{joint distribution}.  The \textbf{marginal} distribution of
+$X_1$ is what you get when you ignore all other coordinates.
+The \textbf{conditional} distribution of $X_1$ given $X_2=x_2$ is what
+you get when you \emph{fix} $X_2$ and look at the remaining
+uncertainty.
+
+\textbf{Why this matters for a computer scientist:}
+A joint distribution is like a multidimensional array of probabilities.
+Marginalisation is summing over an axis.  Conditioning is slicing the
+array at a fixed index and renormalising.  Nothing mysterious—but the
+notation in mathematical statistics often hides this simple picture.
+
+\subsection{Covariance matrix}
+The \textbf{covariance matrix} $\Sigma$ has entries
+\[
+\Sigma_{jk} = \Cov(X_j,X_k).
+\]
+The diagonal contains the variances; the off-diagonal contains the
+correlations scaled by the standard deviations.
+$\Sigma$ is symmetric and positive semi-definite.  It describes the
+\emph{shape} of the probability cloud: the directions in which the
+cloud is elongated or compressed.
+
+\textbf{Intuition.}  Think of $\Sigma$ as the ``stretch matrix'' of an
+ellipse.  If $\Sigma$ were the identity matrix, the cloud would be a
+sphere.  If $\Sigma$ has a large eigenvalue in some direction, the
+cloud is stretched along that direction.  This is exactly the
+information PCA will exploit later.
+
+% ======================================================================
+\section{The Multivariate Normal Distribution}
+
+\subsection{Why it is everywhere}
+The multivariate normal (MVN) distribution is the natural
+generalisation of the bell curve.  It is defined by a mean vector
+$\boldsymbol{\mu}$ and a covariance matrix $\Sigma$.  Its density is
+\[
+f(\vect{x}) = \frac{1}{(2\pi)^{p/2}|\Sigma|^{1/2}}
+\exp\!\left(-\frac12(\vect{x}-\boldsymbol{\mu})^\top
+\Sigma^{-1}(\vect{x}-\boldsymbol{\mu})\right).
+\]
+The quadratic form inside the exponent,
+\[
+d_M^2(\vect{x}) = (\vect{x}-\boldsymbol{\mu})^\top
+\Sigma^{-1}(\vect{x}-\boldsymbol{\mu}),
+\]
+is the \textbf{Mahalanobis distance}.  It measures how far a point is
+from the centre \emph{in the metric of the data cloud}.
+
+\textbf{Why it works.}  The level sets of the MVN density are
+ellipsoids.  The Mahalanobis distance ``undoes'' the stretching of the
+cloud, so that a point that lies along a stretched direction is not
+penalised for being far away.  In contrast, Euclidean distance treats
+all directions equally and will flag perfectly normal observations as
+outliers simply because the data cloud is elongated.
+
+\textbf{Why other distributions are harder.}  For non-normal data, the
+covariance matrix does not fully describe the shape.  The MVN is
+special because \emph{marginals and conditionals are again normal} and
+linear transformations remain normal.  This closure property makes the
+math tractable and is the reason most classical multivariate methods
+assume (approximate) normality.
+
+% ======================================================================
+\section{Descriptive Statistics for Multivariate Data}
+
+The sample mean is a vector:
+\[
+\bar{\vect{x}} = \frac1n \sum_{i=1}^n \vect{x}_i .
+\]
+The sample covariance matrix is
+\[
+\mat{S} = \frac{1}{n-1}\sum_{i=1}^n
+(\vect{x}_i-\bar{\vect{x}})(\vect{x}_i-\bar{\vect{x}})^\top .
+\]
+The \textbf{correlation matrix} $\mat{R}$ is obtained by standardising
+each variable (subtract mean, divide by standard deviation) before
+computing the covariance.  It removes the units and makes the
+correlations comparable.
+
+\textbf{Practical note.}  Always standardise your data before PCA or
+clustering unless the variables are already on the same scale.
+Otherwise a variable measured in millimetres will dominate one
+measured in metres, even if the latter is more informative.
+
+% ======================================================================
+\section{Outlier Detection}
+
+\subsection{Euclidean distance is naive}
+The Euclidean distance from the mean,
+\[
+d_E(\vect{x}) = \|\vect{x}-\bar{\vect{x}}\|,
+\]
+ignores the correlation structure.  A point that lies along the long
+axis of the ellipse will have a large Euclidean distance even though
+it is a typical observation for that direction.
+
+\subsection{Mahalanobis distance}
+The Mahalanobis distance
+\[
+d_M(\vect{x}) = \sqrt{(\vect{x}-\bar{\vect{x}})^\top
+\mat{S}^{-1}(\vect{x}-\bar{\vect{x}})}
+\]
+accounts for the shape of the cloud.  It is the multivariate analogue
+of a $z$-score.  Under the MVN assumption, $d_M^2$ follows a
+chi-square distribution with $p$ degrees of freedom, which gives a
+principled threshold for flagging outliers.
+
+\textbf{Why it works.}  $\mat{S}^{-1}$ down-weights directions in which
+the data naturally varies a lot and up-weights directions in which the
+data is tightly clustered.  A point is an outlier only if it is far
+away \emph{relative to the natural variability} of the cloud.
+
+\textbf{Pitfall.}  If the data contains many outliers, $\mat{S}$ itself
+is distorted.  Robust versions (e.g.\ MCD—minimum covariance
+determinant) estimate the covariance from the clean majority before
+computing distances.
+
+% ======================================================================
+\section{Hypothesis Testing in Multiple Dimensions}
+
+\subsection{Why not run $p$ separate $t$-tests?}
+If you test each coordinate separately, you face the \textbf{multiple
+comparisons problem}.  With $p=10$ independent tests at $\alpha=0.05$,
+the probability of at least one false rejection is
+$1-0.95^{10}\approx 40\%$, not $5\%$.
+Moreover, separate tests ignore the correlations between coordinates,
+so they can miss a difference that is only visible when coordinates
+are combined.
+
+\subsection{Hotelling's $T^2$}
+Hotelling's $T^2$ is the multivariate generalisation of the
+$t$-statistic.  For a sample of vectors $\vect{x}_1,\dots,\vect{x}_n$
+from an MVN distribution, it tests $H_0:\boldsymbol{\mu}=\boldsymbol{\mu}_0$.
+The statistic
+\[
+T^2 = n(\bar{\vect{x}}-\boldsymbol{\mu}_0)^\top
+\mat{S}^{-1}(\bar{\vect{x}}-\boldsymbol{\mu}_0)
+\]
+is a scalar that combines all coordinates in a way that respects
+their covariance.  Under $H_0$ it is related to an $F$-distribution.
+
+\textbf{Intuition.}  $T^2$ asks: \emph{How far is the sample mean from
+the hypothesised mean, measured in units of the natural variability
+of the mean vector?}  If the difference lies along a direction in
+which the sample mean is very stable, even a small difference is
+significant.  If the difference lies along a direction with huge
+variability, a large difference may be noise.
+
+% ======================================================================
+\section{Comparing Multiple Groups: ANOVA and MANOVA}
+
+\subsection{The problem with multiple $t$-tests}
+If you have $k$ groups and you compare all pairs with $t$-tests, you
+inflate the Type~I error rate.  With 5 groups there are 10 pairwise
+tests; the chance of at least one false positive is much larger than
+$0.05$.
+
+\subsection{One-way ANOVA}
+ANOVA compares the \emph{between-group variance} to the
+\emph{within-group variance}:
+\[
+F = \frac{\text{variance of group means}}{\text{average variance inside groups}}.
+\]
+If the group means are genuinely different, the numerator is large
+relative to the denominator.  ANOVA is an \emph{omnibus} test: it
+tells you that \emph{some} difference exists, but not which groups
+differ.  Post-hoc tests (Tukey, Bonferroni, etc.) then localise the
+difference while controlling the family-wise error rate.
+
+\subsection{MANOVA}
+When each observation is a vector rather than a scalar, MANOVA
+(multivariate ANOVA) compares group mean \emph{vectors}.  It uses
+matrices of between-group and within-group sums of squares and
+cross-products instead of scalars.  The intuition is the same:
+\emph{Is the separation between group centres large compared with the
+spread inside the groups?}
+
+\textbf{Why this matters for a CS student.}  Think of ANOVA as a
+statistical version of ``is the between-cluster distance large
+compared with the within-cluster scatter?''.  It is the same idea
+that underlies many clustering validity indices.
+
+% ======================================================================
+\section{Categorical Data and Contingency Tables}
+
+Not all data are continuous.  A \textbf{contingency table} counts how
+many observations fall into each combination of categories.
+For two categorical variables with $r$ and $c$ categories, the table
+has $r\times c$ cells.
+
+The \textbf{chi-square test of independence} compares the observed
+counts $O_{ij}$ with the counts $E_{ij}$ expected if the two variables
+were independent:
+\[
+\chi^2 = \sum_{i,j}\frac{(O_{ij}-E_{ij})^2}{E_{ij}}.
+\]
+A large $\chi^2$ means the observed table is far from what independence
+would predict.
+
+\textbf{Intuition.}  If two variables are independent, the count in a
+cell should be roughly (row total $\times$ column total) / grand total.
+The chi-square statistic aggregates the squared relative deviations.
+It is the categorical analogue of ``correlation''.
+
+\textbf{Multivariate extension.}  For more than two categorical
+variables, log-linear models are the standard tool.  They model the
+log of the expected cell counts as a sum of main effects and
+interactions, exactly like ANOVA but for counts.
+
+% ======================================================================
+\section{Correlation and Its Pitfalls}
+
+\subsection{Pearson correlation}
+The Pearson correlation $\rho_{XY}$ measures the strength of a
+\emph{linear} relationship between two variables.  In a multivariate
+setting, the correlation matrix is the standardised version of the
+covariance matrix.
+
+\subsection{Partial correlation}
+A high correlation between $X$ and $Y$ may be \textbf{spurious}: both
+may be driven by a third variable $Z$.  The \textbf{partial
+correlation} $\rho_{XY\cdot Z}$ measures the correlation between $X$
+and $Y$ after removing the linear effect of $Z$.
+If the partial correlation is much smaller than the raw correlation,
+the raw correlation was largely an artefact of $Z$.
+
+\textbf{Why this matters.}  In causal inference, confusing correlation
+with causation is the classic trap.  Partial correlation is the
+simplest way to ``control for'' a confounder.
+
+\subsection{Copulas (briefly)}
+A \textbf{copula} separates the marginal distributions from the
+dependence structure.  It says: ``You can have any marginal
+distributions you like, and a separate copula that glues them together
+with a chosen dependence pattern.''  This is useful when the
+normal assumption fails but you still want to model dependence.
+
+% ======================================================================
+\section{Regression with Multiple Predictors}
+
+\subsection{Multiple linear regression}
+You model a response $Y$ as a linear combination of predictors
+$\vect{X}=(X_1,\dots,X_p)$ plus noise:
+\[
+Y = \beta_0 + \beta_1 X_1 + \cdots + \beta_p X_p + \varepsilon .
+\]
+The coefficients are estimated by least squares: minimise the sum of
+squared residuals.  In matrix form, $\hat{\boldsymbol{\beta}} =
+(\mat{X}^\top\mat{X})^{-1}\mat{X}^\top\vect{y}$.
+
+\textbf{Why it works.}  Least squares is the maximum-likelihood
+estimate under the assumption that the noise is normal with constant
+variance.  It is also the best linear unbiased estimator (BLUE) under
+weaker assumptions (Gauss–Markov theorem).
+
+\subsection{Multicollinearity}
+When predictors are highly correlated, $\mat{X}^\top\mat{X}$ becomes
+nearly singular.  The coefficient estimates become unstable: small
+changes in the data cause huge changes in $\hat{\boldsymbol{\beta}}$.
+This is \textbf{multicollinearity}.
+
+\textbf{Why it matters.}  A model with unstable coefficients may
+predict well on the training data but generalise poorly.  It also
+makes interpretation impossible: you cannot say ``increasing $X_1$ by
+one unit increases $Y$ by $\beta_1$'' if $X_1$ and $X_2$ always move
+together.
+
+\subsection{Regularisation: Ridge and Lasso}
+To combat multicollinearity and overfitting, add a penalty to the
+least-squares objective:
+\[
+\text{Ridge: } \|\vect{y}-\mat{X}\boldsymbol{\beta}\|^2 +
+\lambda\|\boldsymbol{\beta}\|_2^2,
+\qquad
+\text{Lasso: } \|\vect{y}-\mat{X}\boldsymbol{\beta}\|^2 +
+\lambda\|\boldsymbol{\beta}\|_1 .
+\]
+Ridge shrinks coefficients towards zero; Lasso can set some
+coefficients exactly to zero, performing automatic feature selection.
+
+\textbf{Intuition.}  The penalty is a budget on the size of the
+coefficients.  It prevents the model from relying too heavily on any
+single predictor, which is especially important when predictors are
+correlated.
+
+% ======================================================================
+\section{Dimension Reduction: Principal Component Analysis (PCA)}
+
+\subsection{The problem}
+You have $p$ variables, many of which are correlated.  You suspect that
+the data lie close to a lower-dimensional subspace, but you cannot
+see it because of the noise and the coordinate system.
+
+\subsection{What PCA does}
+PCA finds a new coordinate system in which the axes are ordered by
+the amount of variance they explain.  The first principal component
+(PC1) is the direction of maximum variance.  PC2 is the direction of
+maximum variance \emph{orthogonal} to PC1, and so on.
+
+Mathematically, the principal components are the eigenvectors of the
+covariance matrix $\Sigma$ (or correlation matrix $\mat{R}$), ordered
+by their eigenvalues.  The eigenvalue $\lambda_j$ is the variance
+explained by PC $j$.
+
+\subsection{Why it works}
+The covariance matrix encodes the shape of the data cloud.  Its
+eigenvectors are the axes of the ellipsoid that best fits the cloud;
+the eigenvalues are the lengths of those axes.  By projecting onto
+the top $k$ eigenvectors, you keep the directions where the data
+varies most and discard the directions where it is almost constant.
+
+\textbf{Why not just pick random dimensions?}  Because the original
+coordinates are arbitrary.  A variable that looks important in the
+original space may actually be a combination of several underlying
+factors.  PCA finds the \emph{natural} axes of the data, independent
+of the original measurement units (provided you standardise first).
+
+\subsection{Pitfalls}
+\begin{itemize}
+    \item \textbf{Scale matters.}  Always standardise unless all
+          variables are in the same units.
+    \item \textbf{PCA is unsupervised.}  It does not know about class
+          labels.  The directions of maximum variance may not be the
+          directions that separate classes.
+    \item \textbf{Interpretation is hard.}  A principal component is a
+          linear combination of all original variables; it rarely has
+          a simple name.
+\end{itemize}
+
+% ======================================================================
+\section{Discriminant Analysis: LDA and QDA}
+
+\subsection{The goal}
+You have labelled data: each observation belongs to one of $K$
+classes.  You want to find a rule that assigns new observations to
+the correct class.
+
+\subsection{Linear Discriminant Analysis (LDA)}
+LDA assumes that each class has a multivariate normal distribution
+with the \emph{same} covariance matrix $\Sigma$, but different means
+$\boldsymbol{\mu}_k$.  It finds linear combinations of the variables
+that maximise the ratio
+\[
+\frac{\text{between-class variance}}{\text{within-class variance}}.
+\]
+In other words, it looks for directions in which the class centres
+are far apart relative to the spread inside each class.
+
+\textbf{Why LDA is not PCA.}  PCA finds directions of maximum overall
+variance, ignoring labels.  LDA finds directions that are \emph{useful
+for classification}.  A direction with huge variance may be useless
+for separating classes if all classes vary in the same way along that
+direction.  Conversely, a direction with small variance may be
+perfectly separating the classes.
+
+\subsection{Quadratic Discriminant Analysis (QDA)}
+QDA relaxes the assumption of equal covariance matrices: each class
+gets its own $\Sigma_k$.  The decision boundaries become quadratic
+instead of linear.  QDA is more flexible but needs more data to
+estimate the extra parameters.  With small samples, LDA is often more
+stable even if its assumptions are slightly violated.
+
+\subsection{PCA--LDA}
+A common pipeline is to first reduce dimensions with PCA (to denoise
+and compress), then apply LDA on the principal components.  This works
+well when the data is high-dimensional and the classes are linearly
+separable after compression, but it can also hurt if the PCA step
+discards directions that were important for classification.
+
+% ======================================================================
+\section{Clustering}
+
+\subsection{The goal}
+Clustering is unsupervised: you have no labels, but you want to group
+observations so that points in the same group are similar and points
+in different groups are dissimilar.
+
+\subsection{K-means}
+K-means partitions the data into $K$ clusters by alternating between
+two steps:
+\begin{enumerate}
+    \item Assign each point to the nearest cluster centre.
+    \item Recompute each centre as the mean of the points assigned to it.
+\end{enumerate}
+It minimises the within-cluster sum of squares.
+
+\textbf{Why it works.}  It is a greedy algorithm for a non-convex
+optimisation problem.  It converges to a local optimum, which may
+depend on the initialisation.  K-means++ is a smarter initialisation
+that often finds better local optima.
+
+\subsection{Hierarchical clustering}
+Hierarchical clustering builds a tree (dendrogram) of nested clusters.
+It does not require you to choose $K$ in advance; you can cut the
+dendrogram at a height that gives a sensible number of clusters.
+
+\textbf{Distance matters.}  Euclidean distance in the original space
+can be misleading if variables are correlated or on different scales.
+Standardise first, or use Mahalanobis distance.
+
+% ======================================================================
+\section{Generating Multivariate Data}
+
+Why would a computer scientist care about generating multivariate
+data?  For simulation, testing algorithms, and bootstrapping.
+
+The standard trick for generating MVN data is the \textbf{Cholesky
+decomposition}.  If $\Sigma = \mat{L}\mat{L}^\top$ with $\mat{L}$
+lower triangular, then
+\[
+\vect{X} = \boldsymbol{\mu} + \mat{L}\vect{Z},
+\qquad \vect{Z}\sim\mathcal{N}(\vect{0},\mat{I}),
+\]
+has covariance matrix $\Sigma$.
+
+\textbf{Intuition.}  Start with independent standard normal variables
+(a spherical cloud).  Multiply by $\mat{L}$ to stretch and rotate the
+cloud into the desired shape.  The Cholesky factor is the ``square
+root'' of the covariance matrix, analogous to taking the square root
+of the variance in the univariate case.
+
+% ======================================================================
+\section{Putting It All Together: A Decision Guide}
+
+\begin{center}
+\begin{tabular}{@{}p{0.28\textwidth}p{0.32\textwidth}p{0.32\textwidth}@{}}
+\toprule
+\textbf{Goal} & \textbf{Method} & \textbf{Key assumption / caveat} \\
+\midrule
+Summarise a multivariate cloud & Mean vector, covariance matrix &
+Sensitive to outliers; use robust versions if needed. \\
+Detect outliers & Mahalanobis distance &
+Needs a good estimate of $\Sigma$; robust MCD helps. \\
+Test a mean vector & Hotelling's $T^2$ &
+Multivariate normality; large $n$ helps. \\
+Compare $k$ group means & ANOVA / MANOVA &
+Independence, normality, homogeneity of variance. \\
+Analyse categorical counts & Chi-square / log-linear models &
+Expected counts should be large enough. \\
+Measure dependence & Correlation, partial correlation &
+Linear relationships only; watch for confounders. \\
+Predict a continuous response & Multiple regression, Ridge/Lasso &
+Check multicollinearity; regularise if $p$ is large. \\
+Reduce dimensions & PCA &
+Standardise first; unsupervised, may discard class-relevant directions. \\
+Classify labelled data & LDA / QDA &
+MVN assumption; LDA needs equal covariances. \\
+Find natural groups & K-means, hierarchical clustering &
+Choose $K$ or cut height; distance metric matters. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ======================================================================
+\section*{Appendix: A Minimal Mathematical Toolkit}
+\addcontentsline{toc}{section}{Appendix: A Minimal Mathematical Toolkit}
+
+\begin{itemize}
+    \item \textbf{Vector:} an ordered list of numbers, $\vect{x}\in\R^p$.
+    \item \textbf{Matrix:} a rectangular array; $\mat{A}^\top$ is the transpose.
+    \item \textbf{Eigenvector/eigenvalue:} $\mat{A}\vect{v}=\lambda\vect{v}$.
+          Eigenvectors are directions that are only stretched (not rotated)
+          by the matrix; eigenvalues are the stretch factors.
+    \item \textbf{Positive semi-definite:} a symmetric matrix $\mat{A}$
+          such that $\vect{x}^\top\mat{A}\vect{x}\ge0$ for all $\vect{x}$.
+          Covariance matrices are always positive semi-definite.
+    \item \textbf{Cholesky decomposition:} $\Sigma=\mat{L}\mat{L}^\top$
+          with $\mat{L}$ lower triangular.  The multivariate analogue of
+          a square root.
+\end{itemize}
+
+\vspace{1cm}
+\noindent\rule{\textwidth}{0.4pt}
+\footnotesize
+This guide is an independent explanation written for learning purposes.
+It is not an official document of ZČU and does not replace the
+lectures, slides, or the teacher’s own materials.
+\normalsize
+
+\end{document}
