@@ -15,7 +15,8 @@ _all ais will be sorted in the order they finished_
 - gemini: vibed whatever will be in lectures 10-12
 - mistral: sloooow, didn't finish in a single session
 - claude: didn't finish in a single session
-- grok: slow, didn't finish in a single session
+- grok: slow, didn't finish in a single session, struggled with done pdf
+  delivery
 
 ### finish order
 
